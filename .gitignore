@@ -127,3 +127,5 @@ public/build/
 
 # Electron
 .electron
+
+.vscode/
