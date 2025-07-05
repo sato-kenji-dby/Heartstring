@@ -5,9 +5,9 @@ name: Heartstring CI/CD
 # 触发工作流的事件
 on:
   push: # 当有代码推送到...
-    branches: [ "main" ] # ...main分支时
+    branches: [ "master" ]
   pull_request: # 或者当有PR提交到...
-    branches: [ "main" ] # ...main分支时
+    branches: [ "master" ]
 
 # 定义工作流要执行的任务
 jobs:
