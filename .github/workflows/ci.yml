@@ -5,15 +5,15 @@ name: Heartstring CI/CD
 # 触发工作流的事件
 on:
   push: # 当有代码推送到...
-    branches: [ "master" ]
+    branches: [ "master" ] # 更改为 main 分支
   pull_request: # 或者当有PR提交到...
-    branches: [ "master" ]
+    branches: [ "master" ] # 更改为 main 分支
 
 # 定义工作流要执行的任务
 jobs:
   # 第一个任务：代码质量检查与测试
-  quality-check:
-    name: Lint & Test
+  test-and-lint: # 重命名为 test-and-lint
+    name: Test & Lint
     runs-on: ubuntu-latest # 在最新的Ubuntu虚拟机上运行
 
     steps:
@@ -36,15 +36,15 @@ jobs:
       - name: Run Linting
         run: npm run lint
 
-      # 5. 运行测试 (即使现在没有测试文件，也要运行，确保流程通畅)
+      # 5. 运行测试
       - name: Run Tests
-        run: npm run test
+        run: npm run test # 执行 npm run test
 
   # 第二个任务：跨平台打包应用
-  build-app:
+  build: # 重命名为 build
     name: Build Application
-    # 'needs'关键字确保这个任务会在'quality-check'成功后才开始
-    needs: quality-check 
+    # 'needs'关键字确保这个任务会在'test-and-lint'成功后才开始
+    needs: test-and-lint # 依赖 test-and-lint
     
     # 'strategy.matrix'是CI/CD的精髓：并行运行多个配置
     strategy:
@@ -90,3 +90,43 @@ jobs:
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
+
+  # 第三部分：创建发布 (可选但推荐)
+  create-release:
+    name: Create GitHub Release
+    needs: build # 依赖 build 作业
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' # 仅在推送到 main 分支时触发
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 允许写入发布内容
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts # 下载到 artifacts 目录
+
+      - name: List downloaded artifacts
+        run: ls -R artifacts
+
+      - name: Get version from package.json
+        id: get_version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2 # 使用创建 GitHub Release 的 Action
+        with:
+          tag_name: v${{ env.VERSION }} # 标签名，例如 v0.0.1
+          name: Release v${{ env.VERSION }}
+          body: |
+            Automated release for version ${{ env.VERSION }}.
+            
+            This release includes:
+            - New unit tests for library service
+            - Updated CI/CD workflow
+          draft: true # 创建草稿发布
+          prerelease: true # 标记为预发布
+          files: artifacts/**/* # 上传所有下载的产物

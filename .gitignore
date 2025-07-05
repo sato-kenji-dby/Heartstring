@@ -130,3 +130,6 @@ public/build/
 .electron
 
 .vscode/
+
+# test
+test-data/
