@@ -14,7 +14,7 @@ class MusicDatabase {
    * @param {string} dbPath
    */
   constructor(dbPath = 'music.db') {
-    this.db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'test' ? null : console.log });
+    this.db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'test' ? undefined : console.log });
     this.init();
   }
 
@@ -50,7 +50,7 @@ class MusicDatabase {
    * @returns {Track[]}
    */
   getAllTracks() {
-    return this.db.prepare('SELECT * FROM tracks').all();
+    return /** @type {Track[]} */ (this.db.prepare('SELECT * FROM tracks').all());
   }
 
   /**
@@ -60,7 +60,7 @@ class MusicDatabase {
   getTrackByPath(path) {
     // Standardize path before querying
     const standardizedPath = path.replace(/\\/g, '/');
-    return this.db.prepare('SELECT * FROM tracks WHERE path = ?').get(standardizedPath);
+    return /** @type {Track | undefined} */ (this.db.prepare('SELECT * FROM tracks WHERE path = ?').get(standardizedPath));
   }
 
   close() {

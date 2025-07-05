@@ -1,16 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs/promises';
-import MusicDatabase from '../database';
+import MusicDatabase from '../database'; // Default import for the class
+import { MusicTrack } from '../database'; // Named import for the interface
 import { scanDirectory } from '../libraryService';
 
-// Since MusicDatabase is a default export, we can't use named import for its type directly.
-// We can use JSDoc for type hinting or create a separate .d.ts file if needed for stricter TS.
-// For now, we'll rely on the runtime import and JSDoc for type inference.
-
 describe('Library Service Unit Tests', () => {
-  /** @type {MusicDatabase} */
-  let db; // Revert to JSDoc for type hinting
+  let db: MusicDatabase; // Explicitly type db
   const TEST_DB_PATH = ':memory:'; // Use in-memory database for testing
   const TEST_DATA_DIR = path.join(process.cwd(), 'test-data'); // Use process.cwd() for project root
 
@@ -32,24 +28,24 @@ describe('Library Service Unit Tests', () => {
   });
 
   it('should scan a directory and add tracks to the database', async () => {
-    const scannedTracks = await scanDirectory(TEST_DATA_DIR);
+    const scannedTracks: MusicTrack[] = await scanDirectory(TEST_DATA_DIR); // Explicitly type scannedTracks
     console.log('Scanned Tracks:', scannedTracks); // Debugging log
     db.insertTracks(scannedTracks);
 
-    const allTracks = db.getAllTracks();
+    const allTracks: MusicTrack[] = db.getAllTracks(); // Explicitly type allTracks
     console.log('All Tracks in DB after scan:', allTracks); // Debugging log
     expect(allTracks.length).toBeGreaterThan(0);
     expect(allTracks.length).toBe(scannedTracks.length); // All scanned tracks should be added
   });
 
   it('should correctly read metadata for at least one known track', async () => {
-    const scannedTracks = await scanDirectory(TEST_DATA_DIR);
+    const scannedTracks: MusicTrack[] = await scanDirectory(TEST_DATA_DIR); // Explicitly type scannedTracks
     db.insertTracks(scannedTracks);
 
     // Get the first scanned track to check its metadata
     expect(scannedTracks.length).toBeGreaterThan(0);
-    const firstScannedTrack = scannedTracks[0];
-    const trackFromDb = db.getTrackByPath(firstScannedTrack.path); // Use the actual path from scanned data
+    const firstScannedTrack: MusicTrack = scannedTracks[0]; // Explicitly type firstScannedTrack
+    const trackFromDb: MusicTrack | undefined = db.getTrackByPath(firstScannedTrack.path); // Explicitly type trackFromDb
     
     console.log(`First Scanned Track:`, firstScannedTrack); // Debugging log
     console.log(`Track from DB for ${firstScannedTrack.path}:`, trackFromDb); // Debugging log
@@ -63,7 +59,7 @@ describe('Library Service Unit Tests', () => {
 
   it('should not add duplicate entries when scanning the same directory twice', async () => {
     // First scan
-    let scannedTracks = await scanDirectory(TEST_DATA_DIR);
+    let scannedTracks: MusicTrack[] = await scanDirectory(TEST_DATA_DIR); // Explicitly type scannedTracks
     db.insertTracks(scannedTracks);
     const firstScanCount = db.getAllTracks().length;
 
