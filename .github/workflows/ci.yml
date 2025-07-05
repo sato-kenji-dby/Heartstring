@@ -1,0 +1,92 @@
+# .github/workflows/ci.yml
+
+name: Heartstring CI/CD
+
+# 触发工作流的事件
+on:
+  push: # 当有代码推送到...
+    branches: [ "main" ] # ...main分支时
+  pull_request: # 或者当有PR提交到...
+    branches: [ "main" ] # ...main分支时
+
+# 定义工作流要执行的任务
+jobs:
+  # 第一个任务：代码质量检查与测试
+  quality-check:
+    name: Lint & Test
+    runs-on: ubuntu-latest # 在最新的Ubuntu虚拟机上运行
+
+    steps:
+      # 1. 检出你的代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置Node.js环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # 使用Node.js 20
+          cache: 'npm' # 缓存npm依赖，加快后续运行速度
+
+      # 3. 安装项目依赖
+      - name: Install dependencies
+        run: npm install
+
+      # 4. 运行代码风格检查
+      - name: Run Linting
+        run: npm run lint
+
+      # 5. 运行测试 (即使现在没有测试文件，也要运行，确保流程通畅)
+      - name: Run Tests
+        run: npm run test
+
+  # 第二个任务：跨平台打包应用
+  build-app:
+    name: Build Application
+    # 'needs'关键字确保这个任务会在'quality-check'成功后才开始
+    needs: quality-check 
+    
+    # 'strategy.matrix'是CI/CD的精髓：并行运行多个配置
+    strategy:
+      matrix:
+        # 我们要为这三个平台构建应用
+        os: [ubuntu-latest, macos-latest, windows-latest] 
+
+    # 指定运行的虚拟机环境，会根据上面的matrix变化
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置Node.js环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. 安装项目依赖
+      # 在Windows上，某些依赖（如electron-builder）可能需要特殊处理
+      - name: Install dependencies
+        run: npm install
+
+      # 4. 运行打包命令
+      - name: Build application
+        # 使用 npm run build:app，这是我们在package.json中定义的
+        run: npm run build:app
+
+      # 5. 上传构建产物（打包好的安装包）
+      # 这会将打包好的文件（如.exe, .dmg, .AppImage）上传到GitHub Actions的“Artifacts”中
+      # 这样你就可以在工作流运行结束后，从网页上下载它们
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heartstring-${{ matrix.os }} # e.g., heartstring-windows-latest
+          path: | # 指定要上传的文件路径，根据electron-builder的配置修改
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
