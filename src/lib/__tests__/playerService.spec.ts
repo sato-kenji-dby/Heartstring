@@ -1,102 +1,162 @@
-import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest';
-import { playerService } from '../playerService';
-import { EventEmitter } from 'events';
-import type { ChildProcessWithoutNullStreams } from 'child_process';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { type Track } from '../stores/playerStore';
+import { PlayerService } from '../playerService'; // 导入 PlayerService 类
 
-// Mock child_process.spawn
-const mockProcess = new EventEmitter() as ChildProcessWithoutNullStreams;
-mockProcess.kill = vi.fn() as unknown as (signal?: number | NodeJS.Signals | undefined) => boolean; // Explicitly type kill as a MockInstance
+// Mock Electron's ipcRenderer
+const mockIpcRendererSend = vi.fn();
+const mockIpcRendererOff = vi.fn();
+const mockIpcRendererListeners: { [key: string]: Function } = {};
 
-vi.mock('child_process', () => ({
-  spawn: vi.fn(() => mockProcess) as unknown as MockInstance, // Explicitly type spawn as a MockInstance
-}));
+// Mock the global window.electron object
+// This needs to be outside vi.mock factory to avoid hoisting issues
+Object.defineProperty(window, 'electron', {
+  value: {
+    ipcRenderer: {
+      send: mockIpcRendererSend,
+      on: (channel: string, listener: Function) => {
+        mockIpcRendererListeners[channel] = listener;
+        return { off: mockIpcRendererOff }; // Return a mock for off
+      },
+      off: mockIpcRendererOff,
+    },
+  },
+  writable: true,
+});
 
-// Import the mocked spawn after mocking child_process
-import { spawn } from 'child_process';
+vi.mock('../playerService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../playerService')>();
+  return {
+    ...actual,
+    PlayerService: actual.PlayerService, // Ensure the actual class is used
+    playerService: new actual.PlayerService(), // Re-instantiate the singleton
+  };
+});
 
 describe('PlayerService', () => {
-  let mockSpawnProcess: ChildProcessWithoutNullStreams;
+  // Re-import playerService after the mock is set up
+  // This ensures the singleton is the mocked one
+  let playerServiceInstance: PlayerService;
 
-  beforeEach(() => {
-    // Reset mocks before each test
+  const mockTrack: Track = {
+    id: 1,
+    title: 'Test Song',
+    artist: 'Test Artist',
+    album: 'Test Album',
+    path: '/path/to/test/audio.mp3',
+    duration: 120,
+  };
+
+  beforeEach(async () => {
     vi.clearAllMocks();
-    // Clear all listeners on playerService
-    playerService.removeAllListeners(); // 添加此行以清除事件监听器
-    // Ensure spawn returns the same mocked process for each test
-    mockSpawnProcess = mockProcess; // Directly assign the globally mocked process
-    (mockSpawnProcess.kill as unknown as MockInstance).mockClear(); // Clear kill mock calls, cast to MockInstance
+    // Dynamically import playerService here to ensure mocks are applied
+    const { playerService } = await import('../playerService');
+    playerServiceInstance = playerService; // Use the singleton instance
+    playerServiceInstance.removeAllListeners(); // Clear all listeners on playerServiceInstance
+    // Reset mock listeners
+    for (const key in mockIpcRendererListeners) {
+      delete mockIpcRendererListeners[key];
+    }
   });
 
-  it('should call spawn with correct arguments when play() is called', () => {
-    const filePath = '/path/to/audio.mp3';
-    playerService.play(filePath);
-
-    expect(spawn).toHaveBeenCalledWith('ffplay', ['-nodisp', '-autoexit', '-i', filePath]);
+  it('should send "play-track" IPC message when play() is called', () => {
+    playerServiceInstance.play(mockTrack);
+    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 0 });
+    expect(playerServiceInstance.getCurrentTrack()).toEqual(mockTrack);
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
-  it('should call kill() on the process when stop() is called', () => {
-    const filePath = '/path/to/audio.mp3';
-    playerService.play(filePath); // Start a process
-    playerService.stop();
-
-    expect(mockSpawnProcess.kill).toHaveBeenCalledWith('SIGKILL');
+  it('should send "play-track" IPC message with startTime when resuming', () => {
+    playerServiceInstance.play(mockTrack, 30);
+    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 30 });
   });
 
-  it('should emit "playback-error" when the spawned process emits an "error" event', () => {
-    const filePath = '/path/to/audio.mp3';
-    const mockError = new Error('Test playback error');
+  it('should send "stop-playback" IPC message when stop() is called', () => {
+    playerServiceInstance.stop();
+    expect(mockIpcRendererSend).toHaveBeenCalledWith('stop-playback');
+    expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+    expect(playerServiceInstance.getPausedTime()).toBe(0);
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
+  });
 
-    playerService.play(filePath);
+  it('should send "pause-playback" IPC message when pause() is called', () => {
+    playerServiceInstance.play(mockTrack); // Simulate playing a track
+    playerServiceInstance.pause();
+    expect(mockIpcRendererSend).toHaveBeenCalledWith('pause-playback');
+    expect(playerServiceInstance.getIsPaused()).toBe(true);
+  });
 
+  it('should call play with pausedTime when resume() is called', () => {
+    playerServiceInstance.play(mockTrack); // Simulate playing
+    // Manually set pausedTime for testing resume
+    // In a real scenario, this would be updated by 'ffplay-stderr'
+    (playerServiceInstance as any).pausedTime = 50;
+    (playerServiceInstance as any).currentTrack = mockTrack; // Ensure currentTrack is set for resume
+    playerServiceInstance.pause(); // This will set isPaused to true and send pause-playback
+    mockIpcRendererSend.mockClear(); // Clear previous send calls
+
+    playerServiceInstance.resume();
+    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 50 });
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
+  });
+
+  it('should emit "playback-progress" when "ffplay-stderr" IPC message is received', () => {
+    const mockData = '4.5 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r';
+    const expectedTime = 4.5;
+
+    playerServiceInstance.play(mockTrack); // Set currentTrack for duration
     return new Promise<void>((resolve) => {
-      playerService.on('playback-error', (err) => {
-        expect(err).toBeInstanceOf(Error);
-        expect((err as Error).message).toBe(mockError.message);
+      playerServiceInstance.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
+        expect(currentTime).toBe(expectedTime);
+        expect(duration).toBe(mockTrack.duration);
         resolve();
       });
-      mockSpawnProcess.emit('error', mockError);
+      // Manually trigger the IPC listener
+      mockIpcRendererListeners['ffplay-stderr'](null, mockData);
     });
   });
 
-  it('should emit "playback-ended" when the spawned process "close"s with code 0', () => {
-    const filePath = '/path/to/audio.mp3';
-
-    playerService.play(filePath);
-
+  it('should emit "playback-ended" when "playback-closed" IPC message is received with code 0', () => {
+    playerServiceInstance.play(mockTrack); // Set currentTrack
     return new Promise<void>((resolve) => {
-      playerService.on('playback-ended', () => {
+      playerServiceInstance.on('playback-ended', () => {
+        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+        expect(playerServiceInstance.getPausedTime()).toBe(0);
+        expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      mockSpawnProcess.emit('close', 0);
+      mockIpcRendererListeners['playback-closed'](null, { code: 0 });
     });
   });
 
-  it('should emit "playback-error" when the spawned process "close"s with a non-zero code', () => {
-    const filePath = '/path/to/audio.mp3';
+  it('should emit "playback-error" when "playback-closed" IPC message is received with non-zero code and not paused', () => {
+    playerServiceInstance.play(mockTrack); // Set currentTrack
     const errorCode = 1;
-
-    playerService.play(filePath);
-
     return new Promise<void>((resolve) => {
-      playerService.on('playback-error', (err) => {
+      playerServiceInstance.on('playback-error', (err: Error) => {
         expect(err).toBeInstanceOf(Error);
-        expect((err as Error).message).toBe(`ffplay exited with code ${errorCode}`);
+        expect(err.message).toBe(`ffplay exited with code ${errorCode}`);
+        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+        expect(playerServiceInstance.getPausedTime()).toBe(0);
+        expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      mockSpawnProcess.emit('close', errorCode);
+      mockIpcRendererListeners['playback-closed'](null, { code: errorCode });
     });
   });
 
-  it('should stop any existing process before starting a new one', () => {
-    const filePath1 = '/path/to/audio1.mp3';
-    const filePath2 = '/path/to/audio2.mp3';
-
-    playerService.play(filePath1);
-    const firstProcess = mockSpawnProcess; // Capture the first mocked process
-
-    playerService.play(filePath2); // This should stop the first process
-
-    expect(firstProcess.kill).toHaveBeenCalledWith('SIGKILL');
-    expect(spawn).toHaveBeenCalledTimes(2); // spawn should be called twice
+  it('should emit "playback-error" when "playback-error" IPC message is received', () => {
+    playerServiceInstance.play(mockTrack); // Set currentTrack
+    const errorMessage = 'Failed to start ffplay.';
+    return new Promise<void>((resolve) => {
+      playerServiceInstance.on('playback-error', (err: Error) => {
+        expect(err).toBeInstanceOf(Error);
+        expect(err.message).toBe(errorMessage);
+        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+        expect(playerServiceInstance.getPausedTime()).toBe(0);
+        expect(playerServiceInstance.getIsPaused()).toBe(false);
+        resolve();
+      });
+      mockIpcRendererListeners['playback-error'](null, errorMessage);
+    });
   });
 });

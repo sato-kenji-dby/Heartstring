@@ -1,0 +1,111 @@
+<script lang="ts">
+  import { playerStore } from '$lib/stores/playerStore';
+  import { audioService } from '$lib/audioService';
+
+  // Subscribe to the playerStore
+  $: playerState = $playerStore;
+
+  function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+  }
+
+  function togglePlayPause() {
+    if (playerState.isPlaying) {
+      audioService.pausePlayback();
+    } else if (playerState.status === 'paused' && playerState.currentTrack) {
+      audioService.resumePlayback();
+    } else if (playerState.currentTrack) {
+      // If stopped and a track is available, play it (this might need more sophisticated logic later)
+      audioService.playTrack(playerState.currentTrack);
+    }
+  }
+</script>
+
+<div class="player-controls">
+  {#if playerState.currentTrack}
+    <div class="track-info">
+      <span>{playerState.currentTrack.title}</span> - <span>{playerState.currentTrack.artist}</span>
+    </div>
+  {:else}
+    <div class="track-info">
+      <span>没有正在播放的歌曲</span>
+    </div>
+  {/if}
+
+  <div class="playback-bar">
+    <button on:click={togglePlayPause}>
+      {#if playerState.isPlaying}
+        暂停
+      {:else}
+        播放
+      {/if}
+    </button>
+    <span class="time-display">{formatTime(playerState.progress)} / {formatTime(playerState.duration)}</span>
+    <progress value={playerState.progress} max={playerState.duration}></progress>
+  </div>
+
+  {#if playerState.status === 'error'}
+    <div class="error-message">播放错误！</div>
+  {/if}
+</div>
+
+<style>
+  .player-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border-top: 1px solid #eee;
+    background-color: #f9f9f9;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .track-info {
+    margin-bottom: 10px;
+    font-weight: bold;
+  }
+
+  .playback-bar {
+    display: flex;
+    align-items: center;
+    width: 80%;
+  }
+
+  .playback-bar button {
+    margin-right: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+
+  .time-display {
+    margin-right: 10px;
+    font-size: 0.9em;
+    min-width: 80px; /* Prevent jumping when time changes */
+    text-align: right;
+  }
+
+  .playback-bar progress {
+    flex-grow: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .playback-bar progress::-webkit-progress-bar {
+    background-color: #e0e0e0;
+    border-radius: 5px;
+  }
+
+  .playback-bar progress::-webkit-progress-value {
+    background-color: #007bff;
+    border-radius: 5px;
+  }
+
+  .error-message {
+    color: red;
+    margin-top: 10px;
+  }
+</style>

@@ -114,15 +114,15 @@ jobs:
 
       - name: Get version from package.json
         id: get_version
-        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT" # 使用 GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2 # 使用创建 GitHub Release 的 Action
         with:
-          tag_name: v${{ env.VERSION }} # 标签名，例如 v0.0.1
-          name: Release v${{ env.VERSION }}
+          tag_name: v${{ steps.get_version.outputs.version }} # 标签名，例如 v0.0.1
+          name: Release v${{ steps.get_version.outputs.version }}
           body: |
-            Automated release for version ${{ env.VERSION }}.
+            Automated release for version ${{ steps.get_version.outputs.version }}.
             
             This release includes:
             - New unit tests for library service
