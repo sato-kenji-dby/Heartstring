@@ -1,20 +1,11 @@
-/**
- * @typedef {Object} Track
- * @property {string} path
- * @property {string} [title]
- * @property {string} [artist]
- * @property {string} [album]
- * @property {number} [duration]
- */
-
-const Database = require('better-sqlite3');
+import Database from 'better-sqlite3';
+import type { Track } from '../../types';
 
 class MusicDatabase {
-  /**
-   * @param {string} dbPath
-   */
-  constructor(dbPath = 'music.db') {
-    this.db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'test' ? undefined : console.log });
+  private db: Database.Database;
+
+  constructor(dbPath: string = 'music.db') {
+    this.db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'development' ? console.log : undefined });
     this.init();
   }
 
@@ -31,12 +22,9 @@ class MusicDatabase {
     `);
   }
 
-  /**
-   * @param {Track[]} tracks
-   */
-  insertTracks(tracks) {
+  insertTracks(tracks: Track[]) {
     const insert = this.db.prepare('INSERT OR IGNORE INTO tracks (path, title, artist, album, duration) VALUES (?, ?, ?, ?, ?)');
-    const transaction = this.db.transaction((tracksToInsert) => {
+    const transaction = this.db.transaction((tracksToInsert: Track[]) => {
       for (const track of tracksToInsert) {
         // Standardize path before inserting
         const standardizedPath = track.path.replace(/\\/g, '/');
@@ -46,21 +34,14 @@ class MusicDatabase {
     transaction(tracks);
   }
 
-  /**
-   * @returns {Track[]}
-   */
-  getAllTracks() {
-    return /** @type {Track[]} */ (this.db.prepare('SELECT * FROM tracks').all());
+  getAllTracks(): Track[] {
+    return this.db.prepare('SELECT * FROM tracks').all() as Track[];
   }
 
-  /**
-   * @param {string} path
-   * @returns {Track | undefined}
-   */
-  getTrackByPath(path) {
+  getTrackByPath(path: string): Track | undefined {
     // Standardize path before querying
     const standardizedPath = path.replace(/\\/g, '/');
-    return /** @type {Track | undefined} */ (this.db.prepare('SELECT * FROM tracks WHERE path = ?').get(standardizedPath));
+    return this.db.prepare('SELECT * FROM tracks WHERE path = ?').get(standardizedPath) as Track | undefined;
   }
 
   close() {
@@ -73,4 +54,4 @@ class MusicDatabase {
   }
 }
 
-module.exports = MusicDatabase;
+export default MusicDatabase;

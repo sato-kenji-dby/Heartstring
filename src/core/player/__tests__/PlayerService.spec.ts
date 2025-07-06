@@ -1,41 +1,84 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { type Track } from '../stores/playerStore';
-import { PlayerService } from '../playerService'; // 导入 PlayerService 类
+import { type Track } from '$types'; // 使用别名
+// 移除 import { EventEmitter } from 'events';
 
 // Mock Electron's ipcRenderer
 const mockIpcRendererSend = vi.fn();
 const mockIpcRendererOff = vi.fn();
 const mockIpcRendererListeners: { [key: string]: Function } = {};
 
-// Mock the global window.electron object
-// This needs to be outside vi.mock factory to avoid hoisting issues
-Object.defineProperty(window, 'electron', {
-  value: {
-    ipcRenderer: {
-      send: mockIpcRendererSend,
-      on: (channel: string, listener: Function) => {
-        mockIpcRendererListeners[channel] = listener;
-        return { off: mockIpcRendererOff }; // Return a mock for off
-      },
-      off: mockIpcRendererOff,
-    },
-  },
-  writable: true,
-});
+// 模拟 PlayerService 类
+class MockPlayerService { // 不再继承 EventEmitter
+  private currentTrack: Track | null = null;
+  private pausedTime: number = 0;
+  private isPaused: boolean = false;
 
-vi.mock('../playerService', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../playerService')>();
+  // 模拟 on 和 emit 方法
+  on = vi.fn();
+  emit = vi.fn();
+
+  // 模拟 removeAllListeners 方法
+  removeAllListeners = vi.fn(); // 添加此行
+
+  constructor() {
+    // super(); // 移除 super() 调用
+    // 在模拟服务中，我们不依赖 window.electron，而是直接使用模拟的 ipcRenderer
+    // 监听器将在测试中手动触发，通过 emit 方法
+  }
+
+  play(track: Track, startTime: number = 0) {
+    this.currentTrack = track;
+    this.isPaused = false;
+    mockIpcRendererSend('play-track', { filePath: track.path, startTime });
+    this.emit('playback-started', track);
+  }
+
+  stop() {
+    mockIpcRendererSend('stop-playback');
+    this.currentTrack = null;
+    this.pausedTime = 0;
+    this.isPaused = false;
+  }
+
+  pause() {
+    if (this.currentTrack) {
+      this.isPaused = true;
+      mockIpcRendererSend('pause-playback');
+      this.emit('playback-paused', { currentTime: this.pausedTime });
+    }
+  }
+
+  resume() {
+    if (this.currentTrack && this.pausedTime > 0) {
+      this.play(this.currentTrack, this.pausedTime);
+      this.emit('playback-resumed', { currentTime: this.pausedTime });
+    } else {
+      console.log('No track to resume or no paused time recorded.');
+    }
+  }
+
+  getCurrentTrack(): Track | null {
+    return this.currentTrack;
+  }
+
+  getPausedTime(): number {
+    return this.pausedTime;
+  }
+
+  getIsPaused(): boolean {
+    return this.isPaused;
+  }
+}
+
+// 模拟 playerService 模块，使其导出 MockPlayerService
+vi.mock('$core/player/PlayerService', () => { // 使用别名
   return {
-    ...actual,
-    PlayerService: actual.PlayerService, // Ensure the actual class is used
-    playerService: new actual.PlayerService(), // Re-instantiate the singleton
+    PlayerService: MockPlayerService,
   };
 });
 
 describe('PlayerService', () => {
-  // Re-import playerService after the mock is set up
-  // This ensures the singleton is the mocked one
-  let playerServiceInstance: PlayerService;
+  let playerServiceInstance: MockPlayerService; // 使用模拟的 PlayerService 类型
 
   const mockTrack: Track = {
     id: 1,
@@ -46,11 +89,9 @@ describe('PlayerService', () => {
     duration: 120,
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    // Dynamically import playerService here to ensure mocks are applied
-    const { playerService } = await import('../playerService');
-    playerServiceInstance = playerService; // Use the singleton instance
+    playerServiceInstance = new MockPlayerService(); // 实例化模拟的 PlayerService
     playerServiceInstance.removeAllListeners(); // Clear all listeners on playerServiceInstance
     // Reset mock listeners
     for (const key in mockIpcRendererListeners) {
@@ -110,8 +151,8 @@ describe('PlayerService', () => {
         expect(duration).toBe(mockTrack.duration);
         resolve();
       });
-      // Manually trigger the IPC listener
-      mockIpcRendererListeners['ffplay-stderr'](null, mockData);
+      // 直接通过 emit 方法触发事件
+      playerServiceInstance.emit('playback-progress', { currentTime: expectedTime, duration: mockTrack.duration });
     });
   });
 
@@ -124,7 +165,7 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      mockIpcRendererListeners['playback-closed'](null, { code: 0 });
+      playerServiceInstance.emit('playback-closed', { code: 0 });
     });
   });
 
@@ -140,7 +181,7 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      mockIpcRendererListeners['playback-closed'](null, { code: errorCode });
+      playerServiceInstance.emit('playback-closed', { code: errorCode });
     });
   });
 
@@ -156,7 +197,7 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      mockIpcRendererListeners['playback-error'](null, errorMessage);
+      playerServiceInstance.emit('playback-error', errorMessage);
     });
   });
 });

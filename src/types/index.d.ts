@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+// src/types/index.d.ts
 
 export interface Track {
   id: number; // Changed from string to number to match MusicTrack
@@ -17,14 +17,3 @@ export interface PlayerState {
   status: 'playing' | 'paused' | 'stopped' | 'error';
   queue: Track[]; // Add queue to player state
 }
-
-const initialPlayerState: PlayerState = {
-  currentTrack: null,
-  isPlaying: false,
-  progress: 0,
-  duration: 0,
-  status: 'stopped',
-  queue: [], // Initialize queue
-};
-
-export const playerStore = writable<PlayerState>(initialPlayerState);

@@ -9,8 +9,11 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"moduleResolution": "bundler"
-	}
+		"moduleResolution": "bundler",
+		"outDir": "dist-electron"
+	},
+	"include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.svelte"], // 明确包含所有 TypeScript 和 Svelte 文件
+	"exclude": ["node_modules", "dist-electron"] // 排除 node_modules 和输出目录
 	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
 	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
 	//

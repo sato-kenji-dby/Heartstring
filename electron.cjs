@@ -2,8 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process'); // 导入 spawn
-const MusicDatabase = require('./src/lib/database'); // 导入重构后的数据库模块
-const { scanDirectory } = require('./src/lib/libraryService'); // 导入重构后的扫描服务
+const MusicDatabase = require('./dist-electron/services/database/database'); // 导入重构后的数据库模块
+const { scanDirectory } = require('./dist-electron/services/library/LibraryService'); // 导入重构后的扫描服务
 
 const db = new MusicDatabase(); // 使用新的数据库类
 let mainWindow;
@@ -18,6 +18,25 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
+  });
+
+  // IPC Handlers for Library and Database operations
+  ipcMain.handle('get-all-tracks', async () => {
+    return db.getAllTracks();
+  });
+
+  ipcMain.handle('open-directory-dialog', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+    });
+    if (!canceled && filePaths.length > 0) {
+      const selectedDirectory = filePaths[0];
+      console.log('Selected directory:', selectedDirectory);
+      const tracks = await scanDirectory(selectedDirectory);
+      db.insertTracks(tracks);
+      return tracks;
+    }
+    return [];
   });
 
   const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -97,8 +116,6 @@ function createWindow() {
       }
   });
 
-  // 移除 add-to-queue, get-queue, resume-playback, playNext 相关的 IPC 监听器
-  // 这些逻辑将移到渲染进程
 }
 
 app.on('ready', createWindow);

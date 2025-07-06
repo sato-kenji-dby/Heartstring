@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { audioService } from '$lib/audioService'; // 导入 audioService
-  import { playerStore, type Track } from '$lib/stores/playerStore'; // 导入 playerStore 和 Track 类型
-  import PlayerControls from './PlayerControls.svelte'; // 导入 PlayerControls 组件
+  import { audioService } from '../../services/audio/AudioService'; // 导入 audioService
+  import { playerStore } from '../../stores/playerStore'; // 导入 playerStore
+  import type { Track } from '../../types'; // 导入 Track 类型
+  import PlayerControls from '../components/PlayerControls.svelte'; // 导入 PlayerControls 组件
 
   let tracks: Track[] = []; // 音乐库列表
 

@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tsconfigPaths from 'vite-tsconfig-paths'; // 导入 vite-tsconfig-paths
 
 export default defineConfig({
   plugins: [
     // 确保Vitest能理解Svelte组件
     svelte({ hot: !process.env.VITEST }),
+    tsconfigPaths(), // 添加此行以支持 tsconfig.json 中的路径别名
   ],
   test: {
     // 在Node.js环境中运行测试，因为我们的应用是桌面应用

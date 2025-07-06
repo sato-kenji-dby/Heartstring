@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs/promises';
-import MusicDatabase from '../database'; // Default import for the class
-import { MusicTrack } from '../database'; // Named import for the interface
-import { scanDirectory } from '../libraryService';
+import MusicDatabase from '$services/database/database'; // 使用别名
+import { type Track as MusicTrack } from '$types'; // 使用别名
+import { scanDirectory } from '$services/library/LibraryService'; // 使用别名
 
 describe('Library Service Unit Tests', () => {
   let db: MusicDatabase; // Explicitly type db
@@ -51,10 +51,10 @@ describe('Library Service Unit Tests', () => {
     console.log(`Track from DB for ${firstScannedTrack.path}:`, trackFromDb); // Debugging log
 
     expect(trackFromDb).toBeDefined();
-    expect(trackFromDb.path).toBe(firstScannedTrack.path.replace(/\\/g, '/')); // Path in DB is standardized
-    expect(typeof trackFromDb.title).toBe('string');
-    expect(typeof trackFromDb.artist).toBe('string');
-    expect(typeof trackFromDb.album).toBe('string');
+    expect(trackFromDb!.path).toBe(firstScannedTrack.path.replace(/\\/g, '/')); // Path in DB is standardized
+    expect(typeof trackFromDb!.title).toBe('string');
+    expect(typeof trackFromDb!.artist).toBe('string');
+    expect(typeof trackFromDb!.album).toBe('string');
   });
 
   it('should not add duplicate entries when scanning the same directory twice', async () => {

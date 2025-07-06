@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { playerStore, type PlayerState, type Track } from '../stores/playerStore';
+import { playerStore } from '$stores/playerStore';
+import { type PlayerState, type Track } from '$types';
 import { get } from 'svelte/store';
 
 describe('playerStore', () => {

@@ -1,33 +1,56 @@
 // src/lib/playerService.js
-import { EventEmitter } from 'events';
-import type { Track } from './stores/playerStore'; // 导入 Track 接口
+import type { Track } from '../../types'; // 导入 Track 接口
 
-// 声明 Electron 暴露的 API
-declare global {
-  interface Window {
-    electron: {
-      ipcRenderer: {
-        send: (channel: string, ...args: any[]) => void;
-        on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => Electron.IpcRenderer;
-        off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
-      };
-    };
-  }
+interface IpcRenderer {
+  send: (channel: string, ...args: any[]) => void;
+  on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => Electron.IpcRenderer;
+  off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
 }
 
-class PlayerService extends EventEmitter {
+// 实现一个简单的事件发射器接口
+interface PlayerServiceEvents {
+  'playback-progress': (data: { currentTime: number; duration: number }) => void;
+  'playback-ended': () => void;
+  'playback-error': (error: Error) => void;
+  'playback-started': (track: Track) => void;
+  'playback-paused': (data: { currentTime: number }) => void;
+  'playback-resumed': (data: { currentTime: number }) => void;
+}
+
+class PlayerService { // 不再继承 EventEmitter
+  private ipcRenderer: IpcRenderer;
   private currentTrack: Track | null = null;
   private pausedTime: number = 0; // 记录暂停时的播放时间
   private isPaused: boolean = false; // 标记是否处于暂停状态
 
-  constructor() {
-    super();
+  // 内部事件监听器存储
+  private listeners: { [K in keyof PlayerServiceEvents]?: PlayerServiceEvents[K][] } = {};
+
+  constructor(ipcRenderer: IpcRenderer) {
+    // super(); // 移除 super() 调用
+    this.ipcRenderer = ipcRenderer;
     this.setupIpcListeners();
+  }
+
+  // 实现 on 方法
+  on<K extends keyof PlayerServiceEvents>(eventName: K, listener: PlayerServiceEvents[K]): void {
+    if (!this.listeners[eventName]) {
+      this.listeners[eventName] = [];
+    }
+    this.listeners[eventName]?.push(listener);
+  }
+
+  // 实现 emit 方法
+  private emit<K extends keyof PlayerServiceEvents>(eventName: K, ...args: Parameters<PlayerServiceEvents[K]>): void {
+    this.listeners[eventName]?.forEach(listener => {
+      // @ts-ignore
+      listener(...args);
+    });
   }
 
   private setupIpcListeners() {
     // 监听主进程转发的 ffplay stderr 数据
-    window.electron.ipcRenderer.on('ffplay-stderr', (event, data: string) => {
+    this.ipcRenderer.on('ffplay-stderr', (event, data: string) => {
       const line = data.toString();
       const match = line.match(/^\s*(\d+\.\d+)/); // 匹配时间码，例如 "4.5 M-A: ..."
       if (match && match[1]) {
@@ -38,7 +61,7 @@ class PlayerService extends EventEmitter {
     });
 
     // 监听主进程通知的 ffplay 进程关闭事件
-    window.electron.ipcRenderer.on('playback-closed', (event, { code }: { code: number }) => {
+    this.ipcRenderer.on('playback-closed', (event, { code }: { code: number }) => {
       if (code === 0) {
         this.emit('playback-ended');
       } else if (code !== null && !this.isPaused) {
@@ -52,7 +75,7 @@ class PlayerService extends EventEmitter {
     });
 
     // 监听主进程通知的 ffplay 进程错误事件
-    window.electron.ipcRenderer.on('playback-error', (event, errorMessage: string) => {
+    this.ipcRenderer.on('playback-error', (event, errorMessage: string) => {
       console.error('ffplay process error:', errorMessage);
       this.emit('playback-error', new Error(errorMessage));
       this.currentTrack = null;
@@ -64,12 +87,12 @@ class PlayerService extends EventEmitter {
   play(track: Track, startTime: number = 0) {
     this.currentTrack = track;
     this.isPaused = false; // 开始播放时重置暂停状态
-    window.electron.ipcRenderer.send('play-track', { filePath: track.path, startTime });
+    this.ipcRenderer.send('play-track', { filePath: track.path, startTime });
     this.emit('playback-started', track);
   }
 
   stop() {
-    window.electron.ipcRenderer.send('stop-playback');
+    this.ipcRenderer.send('stop-playback');
     this.currentTrack = null;
     this.pausedTime = 0;
     this.isPaused = false;
@@ -78,7 +101,7 @@ class PlayerService extends EventEmitter {
   pause() {
     if (this.currentTrack) {
       this.isPaused = true; // 标记为暂停状态
-      window.electron.ipcRenderer.send('pause-playback');
+      this.ipcRenderer.send('pause-playback');
       this.emit('playback-paused', { currentTime: this.pausedTime });
     }
   }
@@ -106,4 +129,3 @@ class PlayerService extends EventEmitter {
 }
 
 export { PlayerService }; // 导出类
-export const playerService = new PlayerService(); // 导出实例

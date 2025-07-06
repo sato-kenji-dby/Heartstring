@@ -1,30 +1,17 @@
-const path = require('path');
-const fs = require('fs/promises');
-/** @type {import('music-metadata') | undefined} */
-let musicMetadata;
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import type { Track } from '../../types'; // 导入 Track 接口
+import * as musicMetadata from 'music-metadata'; // 直接导入 music-metadata
 
 const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.flac', '.wav', '.m4a']);
 
 /**
- * @typedef {Object} TrackMetadata
- * @property {string} path
- * @property {string} [title]
- * @property {string} [artist]
- * @property {string} [album]
- * @property {number} [duration]
- */
-
-/**
  * Scans a directory for music files and extracts their metadata.
  * @param {string} dir - The directory path to scan.
- * @returns {Promise<TrackMetadata[]>} A promise that resolves to an array of track metadata objects.
+ * @returns {Promise<Track[]>} A promise that resolves to an array of track metadata objects.
  */
-async function scanDirectory(dir) {
-  if (!musicMetadata) {
-    musicMetadata = await import('music-metadata');
-  }
-  /** @type {TrackMetadata[]} */
-  let tracks = [];
+export async function scanDirectory(dir: string): Promise<Track[]> {
+  let tracks: Track[] = [];
   try {
     const files = await fs.readdir(dir, { withFileTypes: true });
     for (const file of files) {
@@ -35,11 +22,12 @@ async function scanDirectory(dir) {
         try {
           const metadata = await musicMetadata.parseFile(filePath);
           tracks.push({
+            id: 0, // ID will be assigned by the database
             path: filePath,
-            title: metadata.common.title,
-            artist: metadata.common.artist,
-            album: metadata.common.album,
-            duration: metadata.format.duration,
+            title: metadata.common.title || path.basename(file.name),
+            artist: metadata.common.artist || 'Unknown Artist',
+            album: metadata.common.album || 'Unknown Album',
+            duration: metadata.format.duration || 0,
           });
         } catch (error) {
           console.error(`Error reading metadata for ${filePath}:`, error);
@@ -51,5 +39,3 @@ async function scanDirectory(dir) {
   }
   return tracks;
 }
-
-module.exports = { scanDirectory };

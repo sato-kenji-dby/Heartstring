@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { playerStore } from '$lib/stores/playerStore';
-  import { audioService } from '$lib/audioService';
+  import { playerStore } from '../../stores/playerStore';
+  import { audioService } from '../../services/audio/AudioService';
 
   // Subscribe to the playerStore
   $: playerState = $playerStore;

@@ -1,16 +1,20 @@
-import { playerService } from './playerService';
-import { playerStore, type Track } from './stores/playerStore';
+import { PlayerService } from '../../core/player/PlayerService';
+import { playerStore } from '../../stores/playerStore';
+import type { Track } from '../../types';
 import { get } from 'svelte/store'; // 导入 get 函数
+import { ipcRenderer } from '../../api/ipc'; // 导入 ipcRenderer
 
 class AudioService {
   private queue: Track[] = [];
+  private playerService: PlayerService; // 添加 playerService 实例
 
-  constructor() {
+  constructor(playerService: PlayerService) {
+    this.playerService = playerService; // 实例化 PlayerService
     this.setupListeners();
   }
 
   private setupListeners() {
-    playerService.on('playback-started', (track: Track) => {
+    this.playerService.on('playback-started', (track: Track) => {
       playerStore.update(state => ({
         ...state,
         currentTrack: track,
@@ -21,7 +25,7 @@ class AudioService {
       }));
     });
 
-    playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
+    this.playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
       playerStore.update(state => ({
         ...state,
         progress: currentTime,
@@ -29,7 +33,7 @@ class AudioService {
       }));
     });
 
-    playerService.on('playback-paused', ({ currentTime }: { currentTime: number }) => {
+    this.playerService.on('playback-paused', ({ currentTime }: { currentTime: number }) => {
       playerStore.update(state => ({
         ...state,
         isPlaying: false,
@@ -38,7 +42,7 @@ class AudioService {
       }));
     });
 
-    playerService.on('playback-resumed', ({ currentTime }: { currentTime: number }) => {
+    this.playerService.on('playback-resumed', ({ currentTime }: { currentTime: number }) => {
       playerStore.update(state => ({
         ...state,
         isPlaying: true,
@@ -47,7 +51,7 @@ class AudioService {
       }));
     });
 
-    playerService.on('playback-ended', () => {
+    this.playerService.on('playback-ended', () => {
       playerStore.update(state => ({
         ...state,
         isPlaying: false,
@@ -58,7 +62,7 @@ class AudioService {
       this.playNext(); // 播放结束后自动播放下一首
     });
 
-    playerService.on('playback-error', (error: Error) => {
+    this.playerService.on('playback-error', (error: Error) => {
       console.error('AudioService received playback error:', error);
       playerStore.update(state => ({
         ...state,
@@ -71,21 +75,21 @@ class AudioService {
   }
 
   playTrack(track: Track) {
-    playerService.play(track);
+    this.playerService.play(track);
   }
 
   stopPlayback() {
-    playerService.stop();
+    this.playerService.stop();
     this.queue = []; // 停止时清空队列
     playerStore.update(state => ({ ...state, queue: [] }));
   }
 
   pausePlayback() {
-    playerService.pause();
+    this.playerService.pause();
   }
 
   resumePlayback() {
-    playerService.resume();
+    this.playerService.resume();
   }
 
   addToQueue(track: Track) {
@@ -123,4 +127,4 @@ class AudioService {
   }
 }
 
-export const audioService = new AudioService();
+export const audioService = new AudioService(new PlayerService(ipcRenderer));
