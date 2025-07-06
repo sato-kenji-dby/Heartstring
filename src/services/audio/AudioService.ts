@@ -1,4 +1,4 @@
-import { PlayerService } from '../../core/player/PlayerService';
+import { PlayerService } from '$core/player/PlayerService';
 import { playerStore } from '../../stores/playerStore';
 import type { Track } from '../../types';
 import { get } from 'svelte/store'; // 导入 get 函数

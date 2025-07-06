@@ -1,12 +1,9 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import tsconfigPaths from 'vite-tsconfig-paths'; // 导入 vite-tsconfig-paths
-
 export default defineConfig({
   plugins: [
     // 确保Vitest能理解Svelte组件
     svelte({ hot: !process.env.VITEST }),
-    tsconfigPaths(), // 添加此行以支持 tsconfig.json 中的路径别名
   ],
   test: {
     // 在Node.js环境中运行测试，因为我们的应用是桌面应用
@@ -19,7 +16,6 @@ export default defineConfig({
     // 全局变量，这样就不用在每个测试文件中都 import { describe, it, expect }
     globals: true,
 
-    // (可选) 如果你需要测试UI组件，需要安装 @testing-library/svelte 并取消下面的注释
-    // setupFiles: './src/setupTests.js', 
-  },
+    setupFiles: './setupTests.js', // 启用并指向 setupTests.js
+  }
 });

@@ -58,7 +58,7 @@ describe('AudioService', () => {
 
     // Get the mocked instance that AudioService will use
     // This relies on the vi.mock factory returning the same instance every time PlayerService is instantiated
-    const { PlayerService } = require('../playerService');
+    const { PlayerService } = require('../../../core/player/playerService');
     mockedPlayerService = new PlayerService();
     mockedPlayerService.removeAllListeners(); // Clear listeners on the mocked playerService instance
   });

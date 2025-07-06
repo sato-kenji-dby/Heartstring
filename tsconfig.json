@@ -10,7 +10,8 @@
 		"sourceMap": true,
 		"strict": true,
 		"moduleResolution": "bundler",
-		"outDir": "dist-electron"
+		"outDir": "dist-electron",
+		"verbatimModuleSyntax": false // 禁用 verbatimModuleSyntax
 	},
 	"include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.svelte"], // 明确包含所有 TypeScript 和 Svelte 文件
 	"exclude": ["node_modules", "dist-electron"] // 排除 node_modules 和输出目录

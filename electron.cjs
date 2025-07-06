@@ -2,8 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process'); // 导入 spawn
-const MusicDatabase = require('./dist-electron/services/database/database'); // 导入重构后的数据库模块
-const { scanDirectory } = require('./dist-electron/services/library/LibraryService'); // 导入重构后的扫描服务
+const MusicDatabase = require('./src/services/database/database'); // 导入重构后的数据库模块
+const { scanDirectory } = require('./src/services/library/LibraryService'); // 导入重构后的扫描服务
 
 const db = new MusicDatabase(); // 使用新的数据库类
 let mainWindow;

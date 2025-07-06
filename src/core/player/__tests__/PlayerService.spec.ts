@@ -1,84 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { type Track } from '$types'; // 使用别名
-// 移除 import { EventEmitter } from 'events';
-
-// Mock Electron's ipcRenderer
-const mockIpcRendererSend = vi.fn();
-const mockIpcRendererOff = vi.fn();
-const mockIpcRendererListeners: { [key: string]: Function } = {};
-
-// 模拟 PlayerService 类
-class MockPlayerService { // 不再继承 EventEmitter
-  private currentTrack: Track | null = null;
-  private pausedTime: number = 0;
-  private isPaused: boolean = false;
-
-  // 模拟 on 和 emit 方法
-  on = vi.fn();
-  emit = vi.fn();
-
-  // 模拟 removeAllListeners 方法
-  removeAllListeners = vi.fn(); // 添加此行
-
-  constructor() {
-    // super(); // 移除 super() 调用
-    // 在模拟服务中，我们不依赖 window.electron，而是直接使用模拟的 ipcRenderer
-    // 监听器将在测试中手动触发，通过 emit 方法
-  }
-
-  play(track: Track, startTime: number = 0) {
-    this.currentTrack = track;
-    this.isPaused = false;
-    mockIpcRendererSend('play-track', { filePath: track.path, startTime });
-    this.emit('playback-started', track);
-  }
-
-  stop() {
-    mockIpcRendererSend('stop-playback');
-    this.currentTrack = null;
-    this.pausedTime = 0;
-    this.isPaused = false;
-  }
-
-  pause() {
-    if (this.currentTrack) {
-      this.isPaused = true;
-      mockIpcRendererSend('pause-playback');
-      this.emit('playback-paused', { currentTime: this.pausedTime });
-    }
-  }
-
-  resume() {
-    if (this.currentTrack && this.pausedTime > 0) {
-      this.play(this.currentTrack, this.pausedTime);
-      this.emit('playback-resumed', { currentTime: this.pausedTime });
-    } else {
-      console.log('No track to resume or no paused time recorded.');
-    }
-  }
-
-  getCurrentTrack(): Track | null {
-    return this.currentTrack;
-  }
-
-  getPausedTime(): number {
-    return this.pausedTime;
-  }
-
-  getIsPaused(): boolean {
-    return this.isPaused;
-  }
-}
-
-// 模拟 playerService 模块，使其导出 MockPlayerService
-vi.mock('$core/player/PlayerService', () => { // 使用别名
-  return {
-    PlayerService: MockPlayerService,
-  };
-});
-
+import { PlayerService } from '../PlayerService'; // 导入真实的 PlayerService
 describe('PlayerService', () => {
-  let playerServiceInstance: MockPlayerService; // 使用模拟的 PlayerService 类型
+  let playerServiceInstance: PlayerService; // 使用真实的 PlayerService 类型
+  let mockIpcRenderer: {
+    send: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+    off: ReturnType<typeof vi.fn>;
+  };
+  // 用于存储 ipcRenderer.on 注册的监听器
+  const ipcListeners: { [channel: string]: Function[] } = {};
 
   const mockTrack: Track = {
     id: 1,
@@ -91,29 +22,43 @@ describe('PlayerService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    playerServiceInstance = new MockPlayerService(); // 实例化模拟的 PlayerService
-    playerServiceInstance.removeAllListeners(); // Clear all listeners on playerServiceInstance
-    // Reset mock listeners
-    for (const key in mockIpcRendererListeners) {
-      delete mockIpcRendererListeners[key];
+    // 重置 ipcListeners
+    for (const channel in ipcListeners) {
+      delete ipcListeners[channel];
     }
+
+    mockIpcRenderer = {
+      send: vi.fn(),
+      on: vi.fn((channel, listener) => {
+        if (!ipcListeners[channel]) {
+          ipcListeners[channel] = [];
+        }
+        ipcListeners[channel].push(listener);
+      }),
+      off: vi.fn((channel, listener) => {
+        if (ipcListeners[channel]) {
+          ipcListeners[channel] = ipcListeners[channel].filter(l => l !== listener);
+        }
+      }),
+    };
+    playerServiceInstance = new PlayerService(mockIpcRenderer); // 实例化真实的 PlayerService 并注入模拟的 ipcRenderer
   });
 
   it('should send "play-track" IPC message when play() is called', () => {
     playerServiceInstance.play(mockTrack);
-    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 0 });
+    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 0 });
     expect(playerServiceInstance.getCurrentTrack()).toEqual(mockTrack);
     expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
   it('should send "play-track" IPC message with startTime when resuming', () => {
     playerServiceInstance.play(mockTrack, 30);
-    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 30 });
+    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 30 });
   });
 
   it('should send "stop-playback" IPC message when stop() is called', () => {
     playerServiceInstance.stop();
-    expect(mockIpcRendererSend).toHaveBeenCalledWith('stop-playback');
+    expect(mockIpcRenderer.send).toHaveBeenCalledWith('stop-playback');
     expect(playerServiceInstance.getCurrentTrack()).toBeNull();
     expect(playerServiceInstance.getPausedTime()).toBe(0);
     expect(playerServiceInstance.getIsPaused()).toBe(false);
@@ -122,7 +67,7 @@ describe('PlayerService', () => {
   it('should send "pause-playback" IPC message when pause() is called', () => {
     playerServiceInstance.play(mockTrack); // Simulate playing a track
     playerServiceInstance.pause();
-    expect(mockIpcRendererSend).toHaveBeenCalledWith('pause-playback');
+    expect(mockIpcRenderer.send).toHaveBeenCalledWith('pause-playback');
     expect(playerServiceInstance.getIsPaused()).toBe(true);
   });
 
@@ -130,13 +75,17 @@ describe('PlayerService', () => {
     playerServiceInstance.play(mockTrack); // Simulate playing
     // Manually set pausedTime for testing resume
     // In a real scenario, this would be updated by 'ffplay-stderr'
-    (playerServiceInstance as any).pausedTime = 50;
-    (playerServiceInstance as any).currentTrack = mockTrack; // Ensure currentTrack is set for resume
+    // 真实的 PlayerService 会通过 ipcRenderer.on 接收到 ffplay-stderr 消息来更新 pausedTime
+    // 这里我们直接模拟 ipcRenderer.on 触发 ffplay-stderr 事件
+    const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
+    const ffplayStderrListener = ipcListeners['ffplay-stderr'][0];
+    ffplayStderrListener(event, '50.0 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
+
     playerServiceInstance.pause(); // This will set isPaused to true and send pause-playback
-    mockIpcRendererSend.mockClear(); // Clear previous send calls
+    mockIpcRenderer.send.mockClear(); // Clear previous send calls
 
     playerServiceInstance.resume();
-    expect(mockIpcRendererSend).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 50 });
+    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 50 });
     expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
@@ -151,8 +100,10 @@ describe('PlayerService', () => {
         expect(duration).toBe(mockTrack.duration);
         resolve();
       });
-      // 直接通过 emit 方法触发事件
-      playerServiceInstance.emit('playback-progress', { currentTime: expectedTime, duration: mockTrack.duration });
+      // 触发 ipcRenderer.on 注册的 'ffplay-stderr' 监听器
+      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
+      const ffplayStderrListener = ipcListeners['ffplay-stderr'][0];
+      ffplayStderrListener(event, mockData);
     });
   });
 
@@ -165,7 +116,10 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      playerServiceInstance.emit('playback-closed', { code: 0 });
+      // 触发 ipcRenderer.on 注册的 'playback-closed' 监听器
+      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
+      const playbackClosedListener = ipcListeners['playback-closed'][0];
+      playbackClosedListener(event, { code: 0 });
     });
   });
 
@@ -181,7 +135,10 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      playerServiceInstance.emit('playback-closed', { code: errorCode });
+      // 触发 ipcRenderer.on 注册的 'playback-closed' 监听器
+      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
+      const playbackClosedListener = ipcListeners['playback-closed'][0];
+      playbackClosedListener(event, { code: errorCode });
     });
   });
 
@@ -197,7 +154,10 @@ describe('PlayerService', () => {
         expect(playerServiceInstance.getIsPaused()).toBe(false);
         resolve();
       });
-      playerServiceInstance.emit('playback-error', errorMessage);
+      // 触发 ipcRenderer.on 注册的 'playback-error' 监听器
+      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
+      const playbackErrorListener = ipcListeners['playback-error'][0];
+      playbackErrorListener(event, errorMessage);
     });
   });
 });
