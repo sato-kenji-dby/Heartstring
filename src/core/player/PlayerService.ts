@@ -62,25 +62,27 @@ class PlayerService { // 不再继承 EventEmitter
 
     // 监听主进程通知的 ffplay 进程关闭事件
     this.ipcRenderer.on('playback-closed', (event, { code }: { code: number }) => {
+      const wasPaused = this.isPaused; // 记录原始的 isPaused 状态
+      this.currentTrack = null;
+      this.pausedTime = 0;
+      this.isPaused = false;
+
       if (code === 0) {
         this.emit('playback-ended');
-      } else if (code !== null && !this.isPaused) {
+      } else if (code !== null && !wasPaused) { // 使用原始的 isPaused 状态
         this.emit('playback-error', new Error(`ffplay exited with code ${code}`));
       } else {
         console.log('FFplay process killed by SIGKILL or paused.');
       }
-      this.currentTrack = null;
-      this.pausedTime = 0;
-      this.isPaused = false;
     });
 
     // 监听主进程通知的 ffplay 进程错误事件
     this.ipcRenderer.on('playback-error', (event, errorMessage: string) => {
       console.error('ffplay process error:', errorMessage);
-      this.emit('playback-error', new Error(errorMessage));
       this.currentTrack = null;
       this.pausedTime = 0;
       this.isPaused = false;
+      this.emit('playback-error', new Error(errorMessage));
     });
   }
 
