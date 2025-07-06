@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { audioService } from '$services/audio/AudioService';
+import { audioService } from '../AudioService';
 import { get } from 'svelte/store';
 import { EventEmitter } from 'events';
 import type { PlayerState, Track } from '$types';
 import type { PlayerService } from '$core/player/PlayerService';
-import { playerStore } from '$stores/playerStore';
+import { playerStore } from "../../../stores/playerStore";//'$stores/playerStore';
 
 // 定义一个模拟 PlayerService 的接口，包含其方法和 EventEmitter 的特性
 interface MockPlayerServiceType extends EventEmitter {
@@ -58,7 +58,7 @@ describe('AudioService', () => {
 
     // Get the mocked instance that AudioService will use
     // This relies on the vi.mock factory returning the same instance every time PlayerService is instantiated
-    const { PlayerService } = require('../../../core/player/playerService');
+    const { PlayerService } = require('$core/player/playerService');
     mockedPlayerService = new PlayerService();
     mockedPlayerService.removeAllListeners(); // Clear listeners on the mocked playerService instance
   });
