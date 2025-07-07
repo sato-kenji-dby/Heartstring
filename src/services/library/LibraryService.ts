@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import type { Track } from '../../types'; // 导入 Track 接口
+import type { Track } from '$types'; // 导入 Track 接口
 import * as musicMetadata from 'music-metadata'; // 直接导入 music-metadata
 
 const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.flac', '.wav', '.m4a']);

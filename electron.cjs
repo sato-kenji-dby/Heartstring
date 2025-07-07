@@ -2,10 +2,18 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process'); // 导入 spawn
-const MusicDatabase = require('./src/services/database/database'); // 导入重构后的数据库模块
-const { scanDirectory } = require('./src/services/library/LibraryService'); // 导入重构后的扫描服务
+let MusicDatabase;
+let scanDirectory;
 
-const db = new MusicDatabase(); // 使用新的数据库类
+// 动态导入 ES Modules
+(async () => {
+  const databaseModule = await import('./src/services/database/database.ts');
+  MusicDatabase = databaseModule.default;
+  const libraryModule = await import('./src/services/library/LibraryService.ts');
+  scanDirectory = libraryModule.scanDirectory;
+})();
+
+let db; // 数据库实例将在异步导入完成后初始化
 let mainWindow;
 let currentPlayerProcess = null; // 用于存储 ffplay 进程的引用
 
@@ -14,7 +22,7 @@ function createWindow() {
     width: 800,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.ts'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -22,6 +30,10 @@ function createWindow() {
 
   // IPC Handlers for Library and Database operations
   ipcMain.handle('get-all-tracks', async () => {
+    if (!db) {
+      // 等待数据库模块加载完成
+      await new Promise(resolve => setTimeout(resolve, 100)); // 简单的等待机制，实际应用中应使用更健壮的加载检测
+    }
     return db.getAllTracks();
   });
 
@@ -32,7 +44,15 @@ function createWindow() {
     if (!canceled && filePaths.length > 0) {
       const selectedDirectory = filePaths[0];
       console.log('Selected directory:', selectedDirectory);
+      if (!scanDirectory) {
+        // 等待扫描服务模块加载完成
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       const tracks = await scanDirectory(selectedDirectory);
+      if (!db) {
+        // 等待数据库模块加载完成
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       db.insertTracks(tracks);
       return tracks;
     }
@@ -118,7 +138,19 @@ function createWindow() {
 
 }
 
-app.on('ready', createWindow);
+app.on('ready', async () => {
+  // 确保所有模块都已加载
+  await new Promise(resolve => {
+    const checkInterval = setInterval(() => {
+      if (MusicDatabase && scanDirectory) {
+        clearInterval(checkInterval);
+        resolve(null);
+      }
+    }, 50);
+  });
+  db = new MusicDatabase(); // 在模块加载完成后初始化数据库
+  createWindow();
+});
 
 app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') {

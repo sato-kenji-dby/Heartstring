@@ -1,5 +1,5 @@
 // src/lib/playerService.js
-import type { Track } from '../../types'; // 导入 Track 接口
+import type { Track } from '$types'; // 导入 Track 接口
 
 interface IpcRenderer {
   send: (channel: string, ...args: any[]) => void;

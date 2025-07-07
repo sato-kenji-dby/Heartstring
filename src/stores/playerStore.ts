@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { Track, PlayerState } from '../types';
+import type { Track, PlayerState } from '$types';
 
 const initialPlayerState: PlayerState = {
   currentTrack: null,

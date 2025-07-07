@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import type { Track } from '../../types';
+import type { Track } from '$types';
 
 class MusicDatabase {
   private db: Database.Database;

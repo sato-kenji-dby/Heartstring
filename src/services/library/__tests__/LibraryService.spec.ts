@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
-import fs from 'fs/promises';
 import MusicDatabase from '$services/database/database'; // 使用别名
 import { type Track as MusicTrack } from '$types'; // 使用别名
-import { scanDirectory } from '$services/library/LibraryService'; // 使用别名
+import { scanDirectory } from '../LibraryService'; // 使用别名
 
 describe('Library Service Unit Tests', () => {
   let db: MusicDatabase; // Explicitly type db
