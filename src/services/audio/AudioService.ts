@@ -1,16 +1,21 @@
 import { PlayerService } from '$core/player/PlayerService';
-import { playerStore } from '$stores/playerStore';//'$stores/playerStore';
+import { playerStore } from '$stores/playerStore';
 import type { Track } from '$types';
-import { get } from 'svelte/store'; // 导入 get 函数
-import { ipcRenderer } from '$api/ipc';//'$api/ipc'; // 导入 ipcRenderer
+import { get } from 'svelte/store';
 
 export class AudioService {
   private queue: Track[] = [];
-  private playerService: PlayerService; // 添加 playerService 实例
+  private playerService: PlayerService;
+  private sendToRenderer: ((channel: string, ...args: any[]) => void) | null = null; // 用于向渲染进程发送消息
 
   constructor(playerService: PlayerService) {
-    this.playerService = playerService; // 实例化 PlayerService
+    this.playerService = playerService;
     this.setupListeners();
+  }
+
+  // 设置用于向渲染进程发送消息的函数
+  setMainWindowSender(sender: (channel: string, ...args: any[]) => void) {
+    this.sendToRenderer = sender;
   }
 
   private setupListeners() {
@@ -21,16 +26,22 @@ export class AudioService {
         isPlaying: true,
         status: 'playing',
         progress: 0,
-        duration: track.duration || 0, // Ensure duration is set
+        duration: track.duration || 0,
       }));
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-started', track);
+      }
     });
 
     this.playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
       playerStore.update(state => ({
         ...state,
         progress: currentTime,
-        duration: duration > 0 ? duration : state.duration, // Update duration if provided and valid
+        duration: duration > 0 ? duration : state.duration,
       }));
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-progress', { currentTime, duration });
+      }
     });
 
     this.playerService.on('playback-paused', ({ currentTime }: { currentTime: number }) => {
@@ -40,6 +51,9 @@ export class AudioService {
         status: 'paused',
         progress: currentTime,
       }));
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-paused', { currentTime });
+      }
     });
 
     this.playerService.on('playback-resumed', ({ currentTime }: { currentTime: number }) => {
@@ -49,6 +63,9 @@ export class AudioService {
         status: 'playing',
         progress: currentTime,
       }));
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-resumed', { currentTime });
+      }
     });
 
     this.playerService.on('playback-ended', () => {
@@ -59,7 +76,10 @@ export class AudioService {
         progress: 0,
         currentTrack: null,
       }));
-      this.playNext(); // 播放结束后自动播放下一首
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-ended');
+      }
+      this.playNext();
     });
 
     this.playerService.on('playback-error', (error: Error) => {
@@ -68,9 +88,11 @@ export class AudioService {
         ...state,
         isPlaying: false,
         status: 'error',
-        // Optionally, clear currentTrack or set error message
       }));
-      this.playNext(); // 播放错误后也尝试播放下一首
+      if (this.sendToRenderer) {
+        this.sendToRenderer('playback-error', error.message);
+      }
+      this.playNext();
     });
   }
 
@@ -80,7 +102,7 @@ export class AudioService {
 
   stopPlayback() {
     this.playerService.stop();
-    this.queue = []; // 停止时清空队列
+    this.queue = [];
     playerStore.update(state => ({ ...state, queue: [] }));
   }
 
@@ -127,4 +149,5 @@ export class AudioService {
   }
 }
 
-export const audioService = new AudioService(new PlayerService(ipcRenderer));
+// 移除这里的实例化，因为 AudioService 将在主进程中实例化
+// export const audioService = new AudioService(new PlayerService(ipcRenderer));

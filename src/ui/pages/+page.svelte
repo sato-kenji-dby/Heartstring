@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { audioService } from '$services/audio/AudioService'; // 导入 audioService
   import { playerStore } from '$stores/playerStore'; // 导入 playerStore
   import type { Track } from '$types'; // 导入 Track 类型
   import PlayerControls from '../components/PlayerControls.svelte'; // 导入 PlayerControls 组件
@@ -16,20 +15,16 @@
   }
 
   async function playTrack(track: Track) {
-    audioService.playTrack(track);
+    window.audio.play(track);
   }
 
   async function addToQueue(track: Track) {
-    audioService.addToQueue(track);
+    window.audio.addToQueue(track);
   }
 
   onMount(async () => {
     await fetchTracks();
-    // await fetchQueue(); // 移除，队列管理将移到渲染进程
-
-    // 确保 audioService 被实例化，以便其监听器被设置
-    // 由于 audioService 是一个单例，导入它就足够了
-    console.log('AudioService initialized.');
+    console.log('Page mounted and tracks fetched.');
   });
 
   async function handleSelectFolder() {

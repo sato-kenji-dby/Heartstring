@@ -1,11 +1,5 @@
-// src/lib/playerService.js
-import type { Track } from '$types'; // 导入 Track 接口
-
-interface IpcRenderer {
-  send: (channel: string, ...args: any[]) => void;
-  on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => Electron.IpcRenderer;
-  off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
-}
+import type { Track } from '$types';
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 
 // 实现一个简单的事件发射器接口
 interface PlayerServiceEvents {
@@ -17,19 +11,17 @@ interface PlayerServiceEvents {
   'playback-resumed': (data: { currentTime: number }) => void;
 }
 
-class PlayerService { // 不再继承 EventEmitter
-  private ipcRenderer: IpcRenderer;
+class PlayerService {
+  private ffplayProcess: ChildProcessWithoutNullStreams | null = null;
   private currentTrack: Track | null = null;
-  private pausedTime: number = 0; // 记录暂停时的播放时间
-  private isPaused: boolean = false; // 标记是否处于暂停状态
+  private pausedTime: number = 0;
+  private isPaused: boolean = false;
 
   // 内部事件监听器存储
   private listeners: { [K in keyof PlayerServiceEvents]?: PlayerServiceEvents[K][] } = {};
 
-  constructor(ipcRenderer: IpcRenderer) {
-    // super(); // 移除 super() 调用
-    this.ipcRenderer = ipcRenderer;
-    this.setupIpcListeners();
+  constructor() {
+    // 构造函数不再接收 ipcRenderer 或 mainWindow
   }
 
   // 实现 on 方法
@@ -40,7 +32,7 @@ class PlayerService { // 不再继承 EventEmitter
     this.listeners[eventName]?.push(listener);
   }
 
-  // 实现 emit 方法
+  // 实现 emit 方法 (保持 private)
   private emit<K extends keyof PlayerServiceEvents>(eventName: K, ...args: Parameters<PlayerServiceEvents[K]>): void {
     this.listeners[eventName]?.forEach(listener => {
       // @ts-ignore
@@ -48,9 +40,39 @@ class PlayerService { // 不再继承 EventEmitter
     });
   }
 
-  private setupIpcListeners() {
-    // 监听主进程转发的 ffplay stderr 数据
-    this.ipcRenderer.on('ffplay-stderr', (event, data: string) => {
+  // 专用于测试的公共函数，仅在测试环境下可用
+  public _testEmit<K extends keyof PlayerServiceEvents>(eventName: K, ...args: Parameters<PlayerServiceEvents[K]>): void {
+    if (process.env.NODE_ENV === 'test') {
+      this.emit(eventName, ...args);
+    } else {
+      console.warn('Attempted to call _testEmit outside of test environment.');
+    }
+  }
+
+  play(track: Track, startTime: number = 0) {
+    if (this.ffplayProcess) {
+      this.stop(); // 停止当前播放
+    }
+
+    this.currentTrack = track;
+    this.isPaused = false;
+    this.pausedTime = startTime; // 设置起始播放时间
+
+    const args = [
+      '-i', track.path,
+      '-nodisp', // 不显示视频窗口
+      '-autoexit', // 播放结束后自动退出
+      '-loglevel', 'error', // 只显示错误信息
+      '-af', 'volume=1.0', // 默认音量
+    ];
+
+    if (startTime > 0) {
+      args.unshift('-ss', startTime.toString()); // 从指定时间开始播放
+    }
+
+    this.ffplayProcess = spawn('ffplay', args);
+
+    this.ffplayProcess.stderr.on('data', (data) => {
       const line = data.toString();
       const match = line.match(/^\s*(\d+\.\d+)/); // 匹配时间码，例如 "4.5 M-A: ..."
       if (match && match[1]) {
@@ -60,57 +82,60 @@ class PlayerService { // 不再继承 EventEmitter
       }
     });
 
-    // 监听主进程通知的 ffplay 进程关闭事件
-    this.ipcRenderer.on('playback-closed', (event, { code }: { code: number }) => {
-      const wasPaused = this.isPaused; // 记录原始的 isPaused 状态
+    this.ffplayProcess.on('close', (code) => {
+      const wasPaused = this.isPaused;
+      this.ffplayProcess = null;
       this.currentTrack = null;
       this.pausedTime = 0;
       this.isPaused = false;
 
       if (code === 0) {
         this.emit('playback-ended');
-      } else if (code !== null && !wasPaused) { // 使用原始的 isPaused 状态
+      } else if (code !== null && !wasPaused) {
         this.emit('playback-error', new Error(`ffplay exited with code ${code}`));
       } else {
-        console.log('FFplay process killed by SIGKILL or paused.');
+        console.log('FFplay process killed or paused.');
       }
     });
 
-    // 监听主进程通知的 ffplay 进程错误事件
-    this.ipcRenderer.on('playback-error', (event, errorMessage: string) => {
-      console.error('ffplay process error:', errorMessage);
+    this.ffplayProcess.on('error', (err) => {
+      console.error('Failed to start ffplay process:', err);
+      this.ffplayProcess = null;
       this.currentTrack = null;
       this.pausedTime = 0;
       this.isPaused = false;
-      this.emit('playback-error', new Error(errorMessage));
+      this.emit('playback-error', new Error(`Failed to start ffplay: ${err.message}`));
     });
-  }
 
-  play(track: Track, startTime: number = 0) {
-    this.currentTrack = track;
-    this.isPaused = false; // 开始播放时重置暂停状态
-    this.ipcRenderer.send('play-track', { filePath: track.path, startTime });
     this.emit('playback-started', track);
   }
 
   stop() {
-    this.ipcRenderer.send('stop-playback');
+    if (this.ffplayProcess) {
+      this.ffplayProcess.kill('SIGKILL'); // 强制终止进程
+      this.ffplayProcess = null;
+    }
     this.currentTrack = null;
     this.pausedTime = 0;
     this.isPaused = false;
   }
 
   pause() {
-    if (this.currentTrack) {
-      this.isPaused = true; // 标记为暂停状态
-      this.ipcRenderer.send('pause-playback');
+    if (this.ffplayProcess && !this.isPaused) {
+      this.ffplayProcess.stdin.write('p'); // 发送 'p' 暂停
+      this.isPaused = true;
       this.emit('playback-paused', { currentTime: this.pausedTime });
     }
   }
 
   resume() {
-    if (this.currentTrack && this.pausedTime > 0) {
-      this.play(this.currentTrack, this.pausedTime); // 从暂停时间开始播放
+    if (this.ffplayProcess && this.isPaused) {
+      this.ffplayProcess.stdin.write('p'); // 再次发送 'p' 恢复
+      this.isPaused = false;
+      this.emit('playback-resumed', { currentTime: this.pausedTime });
+    } else if (this.currentTrack && this.pausedTime > 0) {
+      // 如果进程已经关闭，从暂停时间重新开始播放
+      this.play(this.currentTrack, this.pausedTime);
       this.emit('playback-resumed', { currentTime: this.pausedTime });
     } else {
       console.log('No track to resume or no paused time recorded.');
@@ -130,4 +155,4 @@ class PlayerService { // 不再继承 EventEmitter
   }
 }
 
-export { PlayerService }; // 导出类
+export { PlayerService };

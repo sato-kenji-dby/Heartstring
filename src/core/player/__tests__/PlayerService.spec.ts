@@ -1,16 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { type Track } from '$types'; // 使用别名
-import { PlayerService } from '../PlayerService'; // 导入真实的 PlayerService
-describe('PlayerService', () => {
-  let playerServiceInstance: PlayerService; // 使用真实的 PlayerService 类型
-  let mockIpcRenderer: {
-    send: ReturnType<typeof vi.fn>;
-    on: ReturnType<typeof vi.fn>;
-    off: ReturnType<typeof vi.fn>;
-  };
-  // 用于存储 ipcRenderer.on 注册的监听器
-  const ipcListeners: { [channel: string]: Function[] } = {};
+import { type Track } from '$types';
+import { PlayerService } from '../PlayerService';
+import { spawn } from 'child_process'; // 导入 spawn
 
+// 模拟 child_process 模块
+vi.mock('child_process', () => {
+  const mockStderrOn = vi.fn();
+  const mockProcessOn = vi.fn();
+  const mockKill = vi.fn();
+  const mockStdinWrite = vi.fn();
+
+  const mockSpawnImplementation = vi.fn(() => ({
+    stderr: {
+      on: mockStderrOn,
+    },
+    on: mockProcessOn,
+    kill: mockKill,
+    stdin: {
+      write: mockStdinWrite,
+    },
+  }));
+
+  return {
+    spawn: mockSpawnImplementation, // 直接返回模拟的实现
+  };
+});
+
+describe('PlayerService', () => {
+  let playerServiceInstance: PlayerService;
   const mockTrack: Track = {
     id: 1,
     title: 'Test Song',
@@ -20,144 +37,176 @@ describe('PlayerService', () => {
     duration: 120,
   };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // 重置 ipcListeners
-    for (const channel in ipcListeners) {
-      delete ipcListeners[channel];
+  // 辅助函数：触发模拟的 ffplay stderr 事件
+  const triggerStderr = (data: string) => {
+    const stderrOnCallback = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value.stderr.on.mock.calls.find(
+      (call: any[]) => call[0] === 'data'
+    )?.[1];
+    if (stderrOnCallback) {
+      stderrOnCallback(Buffer.from(data));
     }
+  };
 
-    mockIpcRenderer = {
-      send: vi.fn(),
-      on: vi.fn((channel, listener) => {
-        if (!ipcListeners[channel]) {
-          ipcListeners[channel] = [];
-        }
-        ipcListeners[channel].push(listener);
-      }),
-      off: vi.fn((channel, listener) => {
-        if (ipcListeners[channel]) {
-          ipcListeners[channel] = ipcListeners[channel].filter(l => l !== listener);
-        }
-      }),
-    };
-    playerServiceInstance = new PlayerService(mockIpcRenderer); // 实例化真实的 PlayerService 并注入模拟的 ipcRenderer
+  // 辅助函数：触发模拟的 ffplay close 事件
+  const triggerClose = (code: number | null, playerService: PlayerService) => {
+    const closeOnCallback = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value.on.mock.calls.find(
+      (call: any[]) => call[0] === 'close'
+    )?.[1];
+    if (closeOnCallback) {
+      closeOnCallback(code);
+      // 模拟 PlayerService 内部的 ffplayProcess 被设置为 null
+      // @ts-ignore
+      playerService.ffplayProcess = null; 
+    }
+  };
+
+  // 辅助函数：触发模拟的 ffplay error 事件
+  const triggerError = (error: Error) => {
+    const errorOnCallback = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value.on.mock.calls.find(
+      (call: any[]) => call[0] === 'error'
+    )?.[1];
+    if (errorOnCallback) {
+      errorOnCallback(error);
+    }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks(); // 清除所有模拟的调用历史和状态
+    playerServiceInstance = new PlayerService();
   });
 
-  it('should send "play-track" IPC message when play() is called', () => {
+  it('should spawn ffplay process and emit "playback-started" when play() is called', () => {
+    const startedSpy = vi.fn();
+    playerServiceInstance.on('playback-started', startedSpy);
+
     playerServiceInstance.play(mockTrack);
-    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 0 });
+
+    expect(spawn).toHaveBeenCalledWith('ffplay', ['-i', mockTrack.path, '-nodisp', '-autoexit', '-loglevel', 'error', '-af', 'volume=1.0']);
     expect(playerServiceInstance.getCurrentTrack()).toEqual(mockTrack);
     expect(playerServiceInstance.getIsPaused()).toBe(false);
+    expect(startedSpy).toHaveBeenCalledWith(mockTrack);
   });
 
-  it('should send "play-track" IPC message with startTime when resuming', () => {
-    playerServiceInstance.play(mockTrack, 30);
-    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 30 });
+  it('should spawn ffplay process with startTime when play() is called with startTime', () => {
+    const startTime = 30;
+    playerServiceInstance.play(mockTrack, startTime);
+    expect(spawn).toHaveBeenCalledWith('ffplay', ['-ss', startTime.toString(), '-i', mockTrack.path, '-nodisp', '-autoexit', '-loglevel', 'error', '-af', 'volume=1.0']);
   });
 
-  it('should send "stop-playback" IPC message when stop() is called', () => {
+  it('should kill ffplay process and reset state when stop() is called', () => {
+    playerServiceInstance.play(mockTrack); // Start a process
+    const mockProcess = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value;
+
     playerServiceInstance.stop();
-    expect(mockIpcRenderer.send).toHaveBeenCalledWith('stop-playback');
+
+    expect(mockProcess.kill).toHaveBeenCalledWith('SIGKILL');
     expect(playerServiceInstance.getCurrentTrack()).toBeNull();
     expect(playerServiceInstance.getPausedTime()).toBe(0);
     expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
-  it('should send "pause-playback" IPC message when pause() is called', () => {
-    playerServiceInstance.play(mockTrack); // Simulate playing a track
+  it('should send "p" to stdin and emit "playback-paused" when pause() is called', () => {
+    playerServiceInstance.play(mockTrack); // Start a process
+    const mockProcess = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const pausedSpy = vi.fn();
+    playerServiceInstance.on('playback-paused', pausedSpy);
+
+    // Simulate some progress to set pausedTime
+    triggerStderr('50.0 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
+
     playerServiceInstance.pause();
-    expect(mockIpcRenderer.send).toHaveBeenCalledWith('pause-playback');
+
+    expect(mockProcess.stdin.write).toHaveBeenCalledWith('p');
     expect(playerServiceInstance.getIsPaused()).toBe(true);
+    expect(pausedSpy).toHaveBeenCalledWith({ currentTime: 50 });
   });
 
-  it('should call play with pausedTime when resume() is called', () => {
-    playerServiceInstance.play(mockTrack); // Simulate playing
-    // Manually set pausedTime for testing resume
-    // In a real scenario, this would be updated by 'ffplay-stderr'
-    // 真实的 PlayerService 会通过 ipcRenderer.on 接收到 ffplay-stderr 消息来更新 pausedTime
-    // 这里我们直接模拟 ipcRenderer.on 触发 ffplay-stderr 事件
-    const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
-    const ffplayStderrListener = ipcListeners['ffplay-stderr'][0];
-    ffplayStderrListener(event, '50.0 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
+  it('should send "p" to stdin and emit "playback-resumed" when resume() is called and paused', () => {
+    playerServiceInstance.play(mockTrack); // Start a process
+    const mockProcess = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value;
+    const resumedSpy = vi.fn();
+    playerServiceInstance.on('playback-resumed', resumedSpy);
 
-    playerServiceInstance.pause(); // This will set isPaused to true and send pause-playback
-    mockIpcRenderer.send.mockClear(); // Clear previous send calls
+    // Simulate pause
+    playerServiceInstance.pause();
+    vi.clearAllMocks(); // Clear previous stdin.write call
 
     playerServiceInstance.resume();
-    expect(mockIpcRenderer.send).toHaveBeenCalledWith('play-track', { filePath: mockTrack.path, startTime: 50 });
+
+    expect(mockProcess.stdin.write).toHaveBeenCalledWith('p');
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
+    expect(resumedSpy).toHaveBeenCalledWith({ currentTime: 0 }); // pausedTime is 0 initially
+  });
+
+  it('should restart playback from pausedTime when resume() is called and process is not active', () => {
+    playerServiceInstance.play(mockTrack); // Start a process
+    const mockProcess = (spawn as ReturnType<typeof vi.fn>).mock.results[0].value;
+    
+    // Simulate some progress and then process close (e.g., manual kill or error)
+    triggerStderr('50.0 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
+    triggerClose(null, playerServiceInstance); // Simulate process killed without explicit pause
+
+    const resumedSpy = vi.fn();
+    playerServiceInstance.on('playback-resumed', resumedSpy);
+
+    (spawn as ReturnType<typeof vi.fn>).mockClear(); // 清除 spawn 的调用历史
+
+    playerServiceInstance.resume();
+
+    expect(spawn).toHaveBeenCalledWith('ffplay', ['-ss', '50', '-i', mockTrack.path, '-nodisp', '-autoexit', '-loglevel', 'error', '-af', 'volume=1.0']);
+    expect(resumedSpy).toHaveBeenCalledWith({ currentTime: 50 });
+  });
+
+  it('should emit "playback-progress" when ffplay stderr data is received', () => {
+    const progressSpy = vi.fn();
+    playerServiceInstance.on('playback-progress', progressSpy);
+    playerServiceInstance.play(mockTrack); // Set currentTrack for duration
+
+    triggerStderr('4.5 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
+
+    expect(progressSpy).toHaveBeenCalledWith({ currentTime: 4.5, duration: mockTrack.duration });
+    expect(playerServiceInstance.getPausedTime()).toBe(4.5);
+  });
+
+  it('should emit "playback-ended" when ffplay process closes with code 0', () => {
+    const endedSpy = vi.fn();
+    playerServiceInstance.on('playback-ended', endedSpy);
+    playerServiceInstance.play(mockTrack); // Set currentTrack
+
+    triggerClose(0, playerServiceInstance);
+
+    expect(endedSpy).toHaveBeenCalled();
+    expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+    expect(playerServiceInstance.getPausedTime()).toBe(0);
     expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
-  it('should emit "playback-progress" when "ffplay-stderr" IPC message is received', () => {
-    const mockData = '4.5 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r';
-    const expectedTime = 4.5;
+  it('should emit "playback-error" when ffplay process closes with non-zero code and not paused', () => {
+    const errorSpy = vi.fn();
+    playerServiceInstance.on('playback-error', errorSpy);
+    playerServiceInstance.play(mockTrack); // Set currentTrack
 
-    playerServiceInstance.play(mockTrack); // Set currentTrack for duration
-    return new Promise<void>((resolve) => {
-      playerServiceInstance.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
-        expect(currentTime).toBe(expectedTime);
-        expect(duration).toBe(mockTrack.duration);
-        resolve();
-      });
-      // 触发 ipcRenderer.on 注册的 'ffplay-stderr' 监听器
-      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
-      const ffplayStderrListener = ipcListeners['ffplay-stderr'][0];
-      ffplayStderrListener(event, mockData);
-    });
+    triggerClose(1, playerServiceInstance);
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.any(Error));
+    expect(errorSpy.mock.calls[0][0].message).toBe('ffplay exited with code 1');
+    expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+    expect(playerServiceInstance.getPausedTime()).toBe(0);
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 
-  it('should emit "playback-ended" when "playback-closed" IPC message is received with code 0', () => {
+  it('should emit "playback-error" when ffplay process emits an error', () => {
+    const errorSpy = vi.fn();
+    playerServiceInstance.on('playback-error', errorSpy);
     playerServiceInstance.play(mockTrack); // Set currentTrack
-    return new Promise<void>((resolve) => {
-      playerServiceInstance.on('playback-ended', () => {
-        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
-        expect(playerServiceInstance.getPausedTime()).toBe(0);
-        expect(playerServiceInstance.getIsPaused()).toBe(false);
-        resolve();
-      });
-      // 触发 ipcRenderer.on 注册的 'playback-closed' 监听器
-      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
-      const playbackClosedListener = ipcListeners['playback-closed'][0];
-      playbackClosedListener(event, { code: 0 });
-    });
-  });
 
-  it('should emit "playback-error" when "playback-closed" IPC message is received with non-zero code and not paused', () => {
-    playerServiceInstance.play(mockTrack); // Set currentTrack
-    const errorCode = 1;
-    return new Promise<void>((resolve) => {
-      playerServiceInstance.on('playback-error', (err: Error) => {
-        expect(err).toBeInstanceOf(Error);
-        expect(err.message).toBe(`ffplay exited with code ${errorCode}`);
-        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
-        expect(playerServiceInstance.getPausedTime()).toBe(0);
-        expect(playerServiceInstance.getIsPaused()).toBe(false);
-        resolve();
-      });
-      // 触发 ipcRenderer.on 注册的 'playback-closed' 监听器
-      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
-      const playbackClosedListener = ipcListeners['playback-closed'][0];
-      playbackClosedListener(event, { code: errorCode });
-    });
-  });
+    const mockError = new Error('Failed to find ffplay executable.');
+    triggerError(mockError);
 
-  it('should emit "playback-error" when "playback-error" IPC message is received', () => {
-    playerServiceInstance.play(mockTrack); // Set currentTrack
-    const errorMessage = 'Failed to start ffplay.';
-    return new Promise<void>((resolve) => {
-      playerServiceInstance.on('playback-error', (err: Error) => {
-        expect(err).toBeInstanceOf(Error);
-        expect(err.message).toBe(errorMessage);
-        expect(playerServiceInstance.getCurrentTrack()).toBeNull();
-        expect(playerServiceInstance.getPausedTime()).toBe(0);
-        expect(playerServiceInstance.getIsPaused()).toBe(false);
-        resolve();
-      });
-      // 触发 ipcRenderer.on 注册的 'playback-error' 监听器
-      const event = {} as Electron.IpcRendererEvent; // 模拟事件对象
-      const playbackErrorListener = ipcListeners['playback-error'][0];
-      playbackErrorListener(event, errorMessage);
-    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.any(Error));
+    expect(errorSpy.mock.calls[0][0].message).toBe(`Failed to start ffplay: ${mockError.message}`);
+    expect(playerServiceInstance.getCurrentTrack()).toBeNull();
+    expect(playerServiceInstance.getPausedTime()).toBe(0);
+    expect(playerServiceInstance.getIsPaused()).toBe(false);
   });
 });

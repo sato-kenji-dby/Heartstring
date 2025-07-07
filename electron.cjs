@@ -32,23 +32,22 @@ process.on('unhandledRejection', (reason, promise) => {
 let mainWindow; // 主窗口引用
 let db;         // 数据库服务实例
 let playerService; // 播放器服务实例
+let audioService; // 音频服务实例
 let libraryService; // 文件库服务实例
 
 try {
-    // **核心: 使用 require() 并正确处理 export default**
-    // 这种方式在CJS入口文件中最直接、最可靠
     const MusicDatabase = require('./dist-electron/src/services/database/database.cjs').default;
     const { scanDirectory } = require('./dist-electron/src/services/library/LibraryService.cjs');
     const { PlayerService } = require('./dist-electron/src/core/player/PlayerService.cjs');
+    const { AudioService } = require('./dist-electron/src/services/audio/AudioService.cjs'); // 导入 AudioService
 
     // 实例化所有服务
     db = new MusicDatabase();
-    // libraryService = new LibraryService();
-    playerService = new PlayerService(); // 稍后注入mainWindow
+    playerService = new PlayerService();
+    audioService = new AudioService(playerService); // 实例化 AudioService 并传入 PlayerService
 
 } catch (error) {
     console.error('Fatal: Failed to load and initialize core services.', error);
-    // 此时app可能还没ready，弹窗会失败，所以只在console报错并退出
     process.exit(1);
 }
 
@@ -73,12 +72,14 @@ function registerIpcHandlers() {
         return tracks;
     });
 
-    // 播放控制相关 (将事件直接代理到playerService)
-    ipcMain.on('play-track', (_, trackData) => playerService.play(trackData.filePath, trackData.startTime));
-    ipcMain.on('stop-playback', () => playerService.stop());
-    ipcMain.on('pause-playback', () => playerService.pause());
-    ipcMain.on('resume-playback', () => playerService.resume());
-    ipcMain.on('set-volume', (_, volume) => playerService.setVolume(volume));
+    // 播放控制相关 (将事件代理到audioService)
+    ipcMain.on('play-track', (_, track) => audioService.playTrack(track));
+    ipcMain.on('stop-playback', () => audioService.stopPlayback());
+    ipcMain.on('pause-playback', () => audioService.pausePlayback());
+    ipcMain.on('resume-playback', () => audioService.resumePlayback());
+    ipcMain.on('add-to-queue', (_, track) => audioService.addToQueue(track)); // 添加 addToQueue
+    // ipcMain.on('set-volume', (_, volume) => playerService.setVolume(volume)); // 移除或移动到 AudioService
+
 }
 
 /**
@@ -95,12 +96,11 @@ function createWindow() {
         },
     });
 
-    // 将mainWindow实例注入需要它的服务
-    playerService.setWindow(mainWindow);
+    // 将 mainWindow.webContents.send 传递给 AudioService
+    audioService.setMainWindowSender(mainWindow.webContents.send.bind(mainWindow.webContents));
 
-    // 根据环境变量判断是加载开发服务器URL还是本地文件
     const startUrl = process.env.ELECTRON_START_URL || url.format({
-        pathname: path.join(__dirname, 'dist/index.html'), // **重要**: 修正了生产路径
+        pathname: path.join(__dirname, 'dist/index.html'),
         protocol: 'file:',
         slashes: true,
     });

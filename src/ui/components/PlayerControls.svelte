@@ -1,6 +1,7 @@
 <script lang="ts">
   import { playerStore } from '$stores/playerStore';
-  import { audioService } from '$services/audio/AudioService';
+  import type { Track } from '$types'; // 导入 Track 类型
+  // 导入 window.audio 类型声明，虽然这里不需要显式导入，但为了清晰性可以保留
 
   // Subscribe to the playerStore
   $: playerState = $playerStore;
@@ -13,12 +14,12 @@
 
   function togglePlayPause() {
     if (playerState.isPlaying) {
-      audioService.pausePlayback();
+      window.audio.pause();
     } else if (playerState.status === 'paused' && playerState.currentTrack) {
-      audioService.resumePlayback();
+      window.audio.resume();
     } else if (playerState.currentTrack) {
       // If stopped and a track is available, play it (this might need more sophisticated logic later)
-      audioService.playTrack(playerState.currentTrack);
+      window.audio.play(playerState.currentTrack);
     }
   }
 </script>
