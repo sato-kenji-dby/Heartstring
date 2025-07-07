@@ -116,15 +116,20 @@ export class AudioService {
       }
     } else {
       console.log('Queue is empty. No next track to play.');
-      playerStore.update(state => ({
-        ...state,
-        currentTrack: null,
-        isPlaying: false,
-        status: 'stopped',
-        progress: 0,
-      }));
+      playerStore.update(state => {
+        if (state.status !== 'error') {
+          return {
+            ...state,
+            currentTrack: null,
+            isPlaying: false,
+            status: 'stopped',
+            progress: 0,
+          };
+        }
+        return state;
+      });
     }
   }
 }
 
-export const audioService = new AudioService(new PlayerService(ipcRenderer));
+// export const audioService = new AudioService(new PlayerService(ipcRenderer));
