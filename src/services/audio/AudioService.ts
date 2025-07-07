@@ -96,11 +96,6 @@ export class AudioService {
     this.queue.push(track);
     playerStore.update(state => ({ ...state, queue: [...this.queue] }));
     console.log('Added to queue:', track.title, 'Current queue length:', this.queue.length);
-    // 自动播放下一首的逻辑应该由 playback-ended 或 playback-error 事件触发
-    // 如果当前没有播放，并且队列中有歌曲，则自动播放第一首
-    if (get(playerStore).status === 'stopped' && !get(playerStore).currentTrack && this.queue.length === 1) {
-      this.playNext();
-    }
   }
 
   getQueue(): Track[] {
@@ -132,4 +127,4 @@ export class AudioService {
   }
 }
 
-// export const audioService = new AudioService(new PlayerService(ipcRenderer));
+export const audioService = new AudioService(new PlayerService(ipcRenderer));

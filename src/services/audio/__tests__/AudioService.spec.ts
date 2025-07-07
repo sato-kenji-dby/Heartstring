@@ -201,18 +201,6 @@ describe('AudioService', () => {
     expect(state.queue).toEqual([mockTrack]);
   });
 
-  it('should play next track from queue if current track is stopped and queue is not empty', async () => {
-    const track2: Track = { ...mockTrack, id: 2, title: 'Next Song' };
-    playerStore.set({ ...initialPlayerState, status: 'stopped', currentTrack: null, queue: [] }); 
-    await vi.advanceTimersByTime(0); // 确保 playerStore 更新完成
-    audioServiceInstance.addToQueue(track2); // Add track2 to queue
-    await vi.advanceTimersByTime(0); // 确保 playerStore 更新完成
-
-    // Since addToQueue has a subscribe that triggers playNext if stopped and queue not empty
-    expect(mockedPlayerService.play).toHaveBeenCalledWith(track2);
-    expect(get(playerStore).queue).toEqual([]); // Queue should be empty
-  });
-
   it('should not play next track if queue is empty on playback-ended', async () => {
     mockedPlayerService.emit('playback-started', mockTrack);
     await vi.advanceTimersByTime(0); // 确保 playerStore 更新完成
