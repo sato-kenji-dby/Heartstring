@@ -1,28 +1,38 @@
+// file: electron.cjs
+
+// --- 顶层捕获 ---
+process.on('uncaughtException', (error, origin) => {
+    console.error('!!!!!!!!!! UNCAUGHT EXCEPTION !!!!!!!!!');
+    console.error('Origin:', origin);
+    console.error(error);
+    // 在开发时，你甚至可以加一个弹窗
+    // const { dialog } = require('electron');
+    // dialog.showErrorBox('Uncaught Exception', error.stack || error.message);
+    process.exit(1); // 捕获到就退出，防止应用处于不稳定状态
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('!!!!!!!!!! UNHANDLED REJECTION !!!!!!!!!');
+    console.error('Promise:', promise);
+    console.error('Reason:', reason);
+});
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process'); // 导入 spawn
-let MusicDatabase;
-let scanDirectory;
-
-// 动态导入 ES Modules
-(async () => {
-  const databaseModule = await import('./src/services/database/database.ts');
-  MusicDatabase = databaseModule.default;
-  const libraryModule = await import('./src/services/library/LibraryService.ts');
-  scanDirectory = libraryModule.scanDirectory;
-})();
-
 let db; // 数据库实例将在异步导入完成后初始化
 let mainWindow;
 let currentPlayerProcess = null; // 用于存储 ffplay 进程的引用
+let MusicDatabase; // 声明 MusicDatabase
+let scanDirectory; // 声明 scanDirectory
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.ts'),
+      preload: path.join(__dirname, 'dist-electron/preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -30,33 +40,31 @@ function createWindow() {
 
   // IPC Handlers for Library and Database operations
   ipcMain.handle('get-all-tracks', async () => {
-    if (!db) {
-      // 等待数据库模块加载完成
-      await new Promise(resolve => setTimeout(resolve, 100)); // 简单的等待机制，实际应用中应使用更健壮的加载检测
+    try {
+      return await db.getAllTracks();
+    } catch (error) {
+      console.error('Error getting all tracks:', error);
+      throw new Error('Failed to retrieve tracks.');
     }
-    return db.getAllTracks();
   });
 
   ipcMain.handle('open-directory-dialog', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-    });
-    if (!canceled && filePaths.length > 0) {
-      const selectedDirectory = filePaths[0];
-      console.log('Selected directory:', selectedDirectory);
-      if (!scanDirectory) {
-        // 等待扫描服务模块加载完成
-        await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+      });
+      if (!canceled && filePaths.length > 0) {
+        const selectedDirectory = filePaths[0];
+        console.log('Selected directory:', selectedDirectory);
+        const tracks = await scanDirectory(selectedDirectory);
+        db.insertTracks(tracks);
+        return tracks;
       }
-      const tracks = await scanDirectory(selectedDirectory);
-      if (!db) {
-        // 等待数据库模块加载完成
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      db.insertTracks(tracks);
-      return tracks;
+      return [];
+    } catch (error) {
+      console.error('Error opening directory dialog or scanning:', error);
+      throw new Error('Failed to process directory selection.');
     }
-    return [];
   });
 
   const startUrl = process.env.ELECTRON_START_URL || url.format({
@@ -109,7 +117,7 @@ function createWindow() {
       newPlayerProcess.on('error', (err) => {
           if (newPlayerProcess === currentPlayerProcess) { // 确保是当前活跃的进程
               console.error('Failed to start ffplay process.', err);
-              mainWindow.webContents.send('playback-error', err.message);
+              mainWindow.webContents.send('playback-error', { message: err.message, code: err.code });
               currentPlayerProcess = null;
           }
       });
@@ -139,17 +147,18 @@ function createWindow() {
 }
 
 app.on('ready', async () => {
-  // 确保所有模块都已加载
-  await new Promise(resolve => {
-    const checkInterval = setInterval(() => {
-      if (MusicDatabase && scanDirectory) {
-        clearInterval(checkInterval);
-        resolve(null);
-      }
-    }, 50);
-  });
-  db = new MusicDatabase(); // 在模块加载完成后初始化数据库
-  createWindow();
+  try {
+    const databaseModule = await import('./dist-electron/services/database/database.cjs');
+    MusicDatabase = databaseModule.default;
+    const libraryModule = await import('./dist-electron/services/library/LibraryService.cjs');
+    scanDirectory = libraryModule.scanDirectory;
+
+    db = new MusicDatabase(); // 在模块加载完成后初始化数据库
+    createWindow();
+  } catch (error) {
+    console.error('Failed to load modules or initialize database:', error);
+    app.quit(); // 如果关键模块加载失败，则退出应用
+  }
 });
 
 app.on('window-all-closed', function () {
