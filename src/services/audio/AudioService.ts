@@ -4,7 +4,7 @@ import type { Track } from '$types';
 import { get } from 'svelte/store'; // 导入 get 函数
 import { ipcRenderer } from '$api/ipc';//'$api/ipc'; // 导入 ipcRenderer
 
-class AudioService {
+export class AudioService {
   private queue: Track[] = [];
   private playerService: PlayerService; // 添加 playerService 实例
 
@@ -94,7 +94,7 @@ class AudioService {
 
   addToQueue(track: Track) {
     this.queue.push(track);
-    playerStore.update(state => ({ ...state, queue: this.queue }));
+    playerStore.update(state => ({ ...state, queue: [...this.queue] }));
     console.log('Added to queue:', track.title, 'Current queue length:', this.queue.length);
     // 自动播放下一首的逻辑应该由 playback-ended 或 playback-error 事件触发
     // 如果当前没有播放，并且队列中有歌曲，则自动播放第一首
