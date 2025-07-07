@@ -1,7 +1,8 @@
 import { register, loadConfig } from 'tsconfig-paths';
+import type { ConfigLoaderSuccessResult, ConfigLoaderFailResult } from 'tsconfig-paths';
 
 // 加载 tsconfig.json 并处理注释
-const tsConfig = loadConfig();
+const tsConfig: ConfigLoaderSuccessResult | ConfigLoaderFailResult = loadConfig();
 
 if (tsConfig.resultType === 'success') {
   const baseUrl = tsConfig.absoluteBaseUrl;
