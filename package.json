@@ -5,35 +5,27 @@
 	"main": "electron.cjs",
 	"type": "module",
 	"scripts": {
-    
-    "lint": "prettier --check . && eslint .",
-    "lint:fix": "prettier --write . && eslint --fix .",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-
-    
-    "clean": "rimraf dist dist-electron",
-    "rebuild": "electron-rebuild",
-    "postinstall": "npm run rebuild",
-
-    
-    "build:frontend": "vite build",
-    "build:electron:compile": "tsc --project tsconfig.electron.json",
-    "build:electron:rename": "renamer --find \".js\" --replace \".cjs\" \"dist-electron/**/*.js\"",
-    "build:electron": "npm run build:electron:compile && npm run build:electron:rename",
-    "build": "npm run clean && npm run build:frontend && npm run build:electron",
-
-    
-    "dev:frontend": "vite dev",
-    "watch:electron": "tsc-watch --project tsconfig.electron.json --onSuccess \"npm run build:electron:rename\"",
-    "start:electron:dev": "nodemon",
-    "dev": "npm run clean && concurrently \"npm:dev:frontend\" \"npm:watch:electron\" \"npm:start:electron:dev\"",
-
-    
-    "start": "electron dist-electron/electron.cjs",
-    "build:app": "npm run build && electron-builder"
-  },
+		"lint": "prettier --check . && eslint .",
+		"lint:fix": "prettier --write . && eslint --fix .",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"clean": "rimraf dist dist-electron",
+		"rebuild": "electron-rebuild",
+		"postinstall": "npm run rebuild",
+		"build:frontend": "vite build",
+		"build:electron:compile": "tsc --project tsconfig.electron.json",
+		"build:electron:rename": "renamer --find \".js\" --replace \".cjs\" \"dist-electron/**/*.js\"",
+		"build:electron": "npm run build:electron:compile && npm run build:electron:rename",
+		"build": "npm run clean && npm run build:frontend && npm run build:electron",
+		"dev:frontend": "vite dev",
+		"watch:electron": "tsc-watch --project tsconfig.electron.json --onSuccess \"npm run build:electron:rename\"",
+		"start:electron:dev": "nodemon",
+		"dev": "npm run clean && concurrently \"npm:dev:frontend\" \"npm:watch:electron\" \"npm:start:electron:dev\"",
+		"dev:electron:start": "nodemon --watch \"dist-electron/**/*.cjs\" --ext cjs --exec \"electron electron.cjs\"",
+		"start": "electron dist-electron/electron.cjs",
+		"build:app": "npm run build && electron-builder"
+	},
 	"devDependencies": {
 		"@electron/rebuild": "^4.0.1",
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -51,6 +43,7 @@
 		"eslint": "^9.30.1",
 		"eslint-plugin-svelte": "^3.10.1",
 		"module-alias": "^2.2.3",
+		"nodemon": "^3.1.10",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"renamer": "^5.0.2",
