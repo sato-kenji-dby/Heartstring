@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import type { Track } from '$types'; // 导入 Track 接口
-import * as musicMetadata from 'music-metadata'; // 直接导入 music-metadata
+// import * as musicMetadata from 'music-metadata'; // 直接导入 music-metadata
 
 const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.flac', '.wav', '.m4a']);
 
@@ -11,6 +11,7 @@ const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.flac', '.wav', '.m4a']);
  * @returns {Promise<Track[]>} A promise that resolves to an array of track metadata objects.
  */
 export async function scanDirectory(dir: string): Promise<Track[]> {
+  const musicMetadata = await import('music-metadata');
   let tracks: Track[] = [];
   try {
     const files = await fs.readdir(dir, { withFileTypes: true });
