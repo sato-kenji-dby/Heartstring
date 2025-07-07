@@ -1,8 +1,8 @@
 import { PlayerService } from '$core/player/PlayerService';
-import { playerStore } from '../../stores/playerStore';//'$stores/playerStore';
+import { playerStore } from '$stores/playerStore';//'$stores/playerStore';
 import type { Track } from '$types';
 import { get } from 'svelte/store'; // 导入 get 函数
-import { ipcRenderer } from '../../api/ipc';//'$api/ipc'; // 导入 ipcRenderer
+import { ipcRenderer } from '$api/ipc';//'$api/ipc'; // 导入 ipcRenderer
 
 class AudioService {
   private queue: Track[] = [];

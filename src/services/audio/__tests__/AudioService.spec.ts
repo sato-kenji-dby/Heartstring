@@ -3,32 +3,42 @@ import { audioService } from '../AudioService';
 import { get } from 'svelte/store';
 import { EventEmitter } from 'events';
 import type { PlayerState, Track } from '$types';
-import type { PlayerService } from '$core/player/PlayerService';
-import { playerStore } from "../../../stores/playerStore";//'$stores/playerStore';
+// 移除 PlayerService 的类型导入，因为我们将直接模拟它
+// import type { PlayerService } from '$core/player/PlayerService';
+import { playerStore } from "$stores/playerStore";
 
-// 定义一个模拟 PlayerService 的接口，包含其方法和 EventEmitter 的特性
-interface MockPlayerServiceType extends EventEmitter {
-  play: typeof PlayerService.prototype.play;
-  stop: typeof PlayerService.prototype.stop;
-  pause: typeof PlayerService.prototype.pause;
-  resume: typeof PlayerService.prototype.resume;
-  // 可以根据需要添加其他公共方法
-}
+// Mock ipcRenderer as it's a dependency of PlayerService
+const mockIpcRenderer = {
+  invoke: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+  send: vi.fn(),
+};
+
+vi.mock('$api/ipc', () => ({
+  ipcRenderer: mockIpcRenderer,
+}));
 
 // Mock the PlayerService class itself
-vi.mock('$core/player/PlayerService', () => {
-  const EventEmitter = require('events');
-  // 在 mock 工厂函数内部创建实例，以避免初始化顺序问题
-  const mockPlayerServiceInstance: MockPlayerServiceType = new EventEmitter() as MockPlayerServiceType;
-  mockPlayerServiceInstance.play = vi.fn();
-  mockPlayerServiceInstance.stop = vi.fn();
-  mockPlayerServiceInstance.pause = vi.fn();
-  mockPlayerServiceInstance.resume = vi.fn();
+vi.mock('$core/player/PlayerService', async () => {
+  const EventEmitterActual = await vi.importActual<typeof import('events')>('events');
+
+  // 创建一个模拟 PlayerService 类，它继承 EventEmitter 并包含 PlayerService 的方法
+  class MockPlayerService extends EventEmitterActual.EventEmitter {
+    constructor(ipcRenderer: any) { // 构造函数需要 ipcRenderer 参数
+      super();
+    }
+    play = vi.fn();
+    stop = vi.fn();
+    pause = vi.fn();
+    resume = vi.fn();
+  }
 
   return {
-    PlayerService: vi.fn(() => mockPlayerServiceInstance), // Return a mock constructor that returns our mock instance
+    PlayerService: MockPlayerService, // 直接返回模拟类
   };
 });
+
 
 describe('AudioService', () => {
   const mockTrack: Track = {
@@ -50,17 +60,17 @@ describe('AudioService', () => {
   };
 
   // Declare a variable to hold the mocked playerService instance
-  let mockedPlayerService: MockPlayerServiceType;
+  // 使用 any 类型，因为我们已经移除了 MockPlayerServiceType 接口
+  let mockedPlayerService: any; 
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    playerStore.set(initialPlayerState); // Reset playerStore
+    playerStore.set(initialPlayerState);
 
-    // Get the mocked instance that AudioService will use
-    // This relies on the vi.mock factory returning the same instance every time PlayerService is instantiated
-    const { PlayerService } = require('$core/player/playerService');
-    mockedPlayerService = new PlayerService();
-    mockedPlayerService.removeAllListeners(); // Clear listeners on the mocked playerService instance
+    const { PlayerService } = await import('$core/player/PlayerService');
+    // 实例化 PlayerService 时，提供 ipcRenderer 的模拟
+    mockedPlayerService = new PlayerService(mockIpcRenderer);
+    mockedPlayerService.removeAllListeners();
   });
 
   it('should delegate playTrack to playerService.play', () => {
