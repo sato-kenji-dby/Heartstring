@@ -36,10 +36,10 @@ let audioService; // 音频服务实例
 let libraryService; // 文件库服务实例
 
 try {
-    const MusicDatabase = require('./dist-electron/src/services/database/database.cjs').default;
-    const { scanDirectory } = require('./dist-electron/src/services/library/LibraryService.cjs');
-    const { PlayerService } = require('./dist-electron/src/core/player/PlayerService.cjs');
-    const { AudioService } = require('./dist-electron/src/services/audio/AudioService.cjs'); // 导入 AudioService
+    const MusicDatabase = require('$services/database/database').default;
+    const { scanDirectory } = require('$services/library/LibraryService');
+    const { PlayerService } = require('$core/player/PlayerService');
+    const { AudioService } = require('$services/audio/AudioService'); // 导入 AudioService
 
     // 实例化所有服务
     db = new MusicDatabase();
