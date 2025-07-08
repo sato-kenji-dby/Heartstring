@@ -1,494 +1,265 @@
-// src/LibraryService.spec.ts
+// src/services/__tests__/libraryScanner.spec.ts
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'path';
-import fs from 'fs'; // We'll mock this
-import { parseFile } from 'music-metadata'; // We'll mock this
-import { scanDirectory } from '../LibraryService'; // Import the function to test
-import { type Track } from '$types'; // Import the Track type
 
-// Mock music-metadata and fs modules
+// --- Mocks ---
+// 模拟 'fs/promises' 模块
+vi.mock('fs/promises', async (importOriginal) => {
+  const original = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...original,
+    readdir: vi.fn(), // 我们只模拟 readdir
+  };
+});
+
+// 模拟 'music-metadata' 模块。
+// 由于它在函数内部通过 await import() 加载，Vitest 的顶层 mock 依然能正确拦截。
 vi.mock('music-metadata', () => ({
   parseFile: vi.fn(),
 }));
-vi.mock('fs', () => ({
-  readdir: vi.fn(),
-  stat: vi.fn(),
-}));
 
-// Helper function to create mock FileStat objects
-const createMockFileStat = (isDirectory: boolean, isFile: boolean = !isDirectory) => ({
-  isDirectory: vi.fn().mockReturnValue(isDirectory),
-  isFile: vi.fn().mockReturnValue(isFile),
-});
+// 动态导入被 mock 的模块，以便我们访问它们的 mock 函数
+let fs: any;
+let mm: any;
 
-// Mock parsed metadata for different file types
-const mockMp3Metadata = {
-  common: {
-    title: 'Mock Song Title',
-    artist: ['Mock Artist'],
-    album: 'Mock Album',
-    duration: 180, // seconds
-  },
-  format: {
-    duration: 180,
-  },
-};
+// 导入被测试的函数
+import { scanDirectory } from '../LibraryService'; 
 
-const mockFlacMetadata = {
-  common: {
-    title: 'Flac Title',
-    artist: ['Flac Artist'],
-    album: 'Flac Album',
-    duration: 240,
-  },
-  format: {
-    duration: 240,
-  },
-};
-
-const mockWavMetadata = {
-  common: {
-    title: 'Wav Tune',
-    artist: ['Wav Performer'],
-    album: 'Wav Collection',
-    duration: 120,
-  },
-  format: {
-    duration: 120,
-  },
-};
-
-const mockM4aMetadata = {
-  common: {
-    title: 'M4a Jam',
-    artist: ['M4a Maestro'],
-    album: 'M4a Archive',
-    duration: 300,
-  },
-  format: {
-    duration: 300,
-  },
-};
-
-// Mock metadata for a file with missing properties
-const mockPartialMetadata = {
-  common: {
-    // title: 'Missing Title', // Missing title
-    artist: ['Partial Artist'],
-    album: 'Partial Album',
-    duration: 150,
-  },
-  format: {
-    duration: 150,
-  },
-};
-
-
-describe('scanDirectory', () => {
-  let mockReaddir: ReturnType<typeof vi.fn>;
-  let mockStat: ReturnType<typeof vi.fn>;
-  let mockParseFile: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    // Reset mocks before each test to ensure isolation
-    mockReaddir = vi.mocked(fs.readdir);
-    mockStat = vi.mocked(fs.stat);
-    mockParseFile = vi.mocked(parseFile);
-
-    // Reset mock implementations
-    mockReaddir.mockReset();
-    mockStat.mockReset();
-    mockParseFile.mockReset();
-
-    // Set default mock implementations that are unlikely to be hit,
-    // to catch unexpected calls if any.
-    mockReaddir.mockRejectedValue(new Error('readdir not implemented'));
-    mockStat.mockRejectedValue(new Error('stat not implemented'));
-    mockParseFile.mockRejectedValue(new Error('parseFile not implemented'));
+// --- Test Suite ---
+describe('scanDirectory Unit Tests', () => {
+  beforeEach(async () => {
+    // 在每个测试前，获取已 mock 的模块实例
+    fs = await import('fs/promises');
+    mm = await import('music-metadata');
+    // 监控 console.error，以便验证错误日志，同时保持测试输出干净
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks(); // Restore all mocks after each test
+    // 清理所有 mocks 和 spies，确保测试之间完全独立
+    vi.restoreAllMocks();
   });
 
-  // --- Success Scenarios ---
-
-  it('should return an empty array for an empty directory', async () => {
-    const mockDir = '/fake/empty/dir';
-    mockReaddir.mockResolvedValue([]); // No files in the directory
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockStat).not.toHaveBeenCalled(); // No files to stat
-    expect(mockParseFile).not.toHaveBeenCalled();
-    expect(tracks).toEqual([]);
+  // --- 辅助函数 ---
+  // 创建模拟 Dirent 对象的辅助函数，以匹配 fs.readdir({ withFileTypes: true }) 的返回类型
+  const createDirent = (name: string, type: 'dir' | 'file') => ({
+    name,
+    isDirectory: () => type === 'dir',
+    isFile: () => type === 'file',
   });
 
-  it('should scan a directory with only supported audio files', async () => {
-    const mockDir = '/fake/music/dir';
-    const files = ['song1.mp3', 'song2.flac', 'song3.wav', 'song4.m4a', 'image.jpg', 'document.txt'];
-
-    // Mock readdir to return the list of files and directories
-    mockReaddir.mockResolvedValue(files);
-
-    // Mock stat for each entry
-    mockStat.mockImplementation((filePath) => {
-      if (filePath === '/fake/music/dir/song1.mp3') return createMockFileStat(false);
-      if (filePath === '/fake/music/dir/song2.flac') return createMockFileStat(false);
-      if (filePath === '/fake/music/dir/song3.wav') return createMockFileStat(false);
-      if (filePath === '/fake/music/dir/song4.m4a') return createMockFileStat(false);
-      if (filePath === '/fake/music/dir/image.jpg') return createMockFileStat(false);
-      if (filePath === '/fake/music/dir/document.txt') return createMockFileStat(false);
-      return Promise.reject(new Error(`Stat not mocked for ${filePath}`));
-    });
-
-    // Mock parseFile for each supported audio file
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === '/fake/music/dir/song1.mp3') return Promise.resolve(mockMp3Metadata);
-      if (filePath === '/fake/music/dir/song2.flac') return Promise.resolve(mockFlacMetadata);
-      if (filePath === '/fake/music/dir/song3.wav') return Promise.resolve(mockWavMetadata);
-      if (filePath === '/fake/music/dir/song4.m4a') return Promise.resolve(mockM4aMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
-    });
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockStat).toHaveBeenCalledTimes(files.length); // Stat called for all entries
-    expect(mockParseFile).toHaveBeenCalledTimes(4); // ParseFile called only for supported files
-
-    // Verify the returned tracks
-    expect(tracks.length).toBe(4);
-
-    // Check specific track details (using absolute paths)
-    const expectedMp3Path = path.resolve('/fake/music/dir/song1.mp3');
-    const mp3Track = tracks.find(t => t.path === expectedMp3Path);
-    expect(mp3Track).toEqual({
-      id: 0,
-      path: expectedMp3Path,
-      title: 'Mock Song Title',
+  // 模拟元数据
+  const mockMetadata = (title: string, overrides: object = {}) => ({
+    common: {
+      title,
       artist: 'Mock Artist',
       album: 'Mock Album',
-      duration: 180,
-    });
-
-    const expectedFlacPath = path.resolve('/fake/music/dir/song2.flac');
-    const flacTrack = tracks.find(t => t.path === expectedFlacPath);
-    expect(flacTrack).toEqual({
-      id: 0,
-      path: expectedFlacPath,
-      title: 'Flac Title',
-      artist: 'Flac Artist',
-      album: 'Flac Album',
-      duration: 240,
-    });
-
-    const expectedWavPath = path.resolve('/fake/music/dir/song3.wav');
-    const wavTrack = tracks.find(t => t.path === expectedWavPath);
-    expect(wavTrack).toEqual({
-      id: 0,
-      path: expectedWavPath,
-      title: 'Wav Tune',
-      artist: 'Wav Performer',
-      album: 'Wav Collection',
-      duration: 120,
-    });
-
-    const expectedM4aPath = path.resolve('/fake/music/dir/song4.m4a');
-    const m4aTrack = tracks.find(t => t.path === expectedM4aPath);
-    expect(m4aTrack).toEqual({
-      id: 0,
-      path: expectedM4aPath,
-      title: 'M4a Jam',
-      artist: 'M4a Maestro',
-      album: 'M4a Archive',
-      duration: 300,
-    });
+      ...overrides,
+    },
+    format: { duration: 180 },
   });
 
-  it('should handle case-insensitive file extensions', async () => {
-    const mockDir = '/fake/case/dir';
-    const files = ['Song.MP3', 'Another.FLAC', 'Test.Wav'];
 
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => createMockFileStat(false));
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath.endsWith('.MP3')) return Promise.resolve(mockMp3Metadata);
-      if (filePath.endsWith('.FLAC')) return Promise.resolve(mockFlacMetadata);
-      if (filePath.endsWith('.Wav')) return Promise.resolve(mockWavMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
-    });
+  // ===================================
+  // ===      成功场景 (Success Scenarios)      ===
+  // ===================================
 
-    const tracks = await scanDirectory(mockDir);
+  it('should scan a flat directory, process supported files, and ignore unsupported ones', async () => {
+    const fakeDir = '/music';
+    const entries = [
+      createDirent('song.mp3', 'file'),
+      createDirent('track.flac', 'file'),
+      createDirent('audio.WAV', 'file'), // 测试大小写不敏感
+      createDirent('sound.M4A', 'file'),
+      createDirent('cover.jpg', 'file'), // 不支持的文件
+      createDirent('notes.txt', 'file'), // 不支持的文件
+    ];
 
-    expect(mockParseFile).toHaveBeenCalledTimes(3);
-    expect(tracks.length).toBe(3);
+    // 安排 (Arrange)
+    fs.readdir.mockResolvedValue(entries);
+    mm.parseFile.mockImplementation((filePath: string) =>
+      Promise.resolve(mockMetadata(`Title for ${path.basename(filePath)}`))
+    );
+
+    // 行动 (Act)
+    const tracks = await scanDirectory(fakeDir);
+
+    // 断言 (Assert)
+    expect(fs.readdir).toHaveBeenCalledWith(fakeDir, { withFileTypes: true });
+    expect(tracks).toHaveLength(4);
+    expect(mm.parseFile).toHaveBeenCalledTimes(4);
+    expect(tracks[0].title).toBe('Title for song.mp3');
   });
 
-  it('should recursively scan subdirectories', async () => {
-    const mockDir = '/fake/recursive/dir';
-    const subDir = 'subdir';
-    const files = ['main_song.mp3', subDir]; // main_song.mp3 and a subdirectory
-
-    const subDirFiles = ['sub_song.flac'];
-
-    // Mock readdir for the main directory
-    mockReaddir.mockImplementation((dirPath) => {
-      if (dirPath === mockDir) return Promise.resolve(files);
-      if (dirPath === path.join(mockDir, subDir)) return Promise.resolve(subDirFiles);
-      return Promise.reject(new Error(`readdir not mocked for ${dirPath}`));
+  it('should recursively scan a multi-level directory structure', async () => {
+    const rootDir = '/library';
+    const rockDir = path.join(rootDir, 'Rock');
+    const popDir = path.join(rootDir, 'Pop');
+    
+    // 安排 (Arrange)
+    fs.readdir.mockImplementation(async (dirPath: string) => {
+      if (dirPath === rootDir) {
+        return [createDirent('song1.mp3', 'file'), createDirent('Rock', 'dir'), createDirent('Pop', 'dir')];
+      }
+      if (dirPath === rockDir) {
+        return [createDirent('song2.flac', 'file')];
+      }
+      if (dirPath === popDir) {
+        return [createDirent('song3.wav', 'file')];
+      }
+      return [];
     });
 
-    // Mock stat for entries
-    mockStat.mockImplementation((filePath) => {
-      if (filePath === path.join(mockDir, 'main_song.mp3')) return createMockFileStat(false);
-      if (filePath === path.join(mockDir, subDir)) return createMockFileStat(true); // This is a directory
-      if (filePath === path.join(mockDir, subDir, 'sub_song.flac')) return createMockFileStat(false);
-      return Promise.reject(new Error(`Stat not mocked for ${filePath}`));
-    });
+    mm.parseFile.mockResolvedValue(mockMetadata('A Great Song'));
 
-    // Mock parseFile for audio files
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === path.join(mockDir, 'main_song.mp3')) return Promise.resolve(mockMp3Metadata);
-      if (filePath === path.join(mockDir, subDir, 'sub_song.flac')) return Promise.resolve(mockFlacMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
-    });
+    // 行动 (Act)
+    const tracks = await scanDirectory(rootDir);
 
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockReaddir).toHaveBeenCalledWith(path.join(mockDir, subDir)); // Called for subdirectory
-    expect(mockStat).toHaveBeenCalledTimes(3); // 1 for file, 1 for dir, 1 for subfile
-    expect(mockParseFile).toHaveBeenCalledTimes(2); // For both audio files
-    expect(tracks.length).toBe(2);
-
-    const expectedMainTrackPath = path.resolve('/fake/recursive/dir/main_song.mp3');
-    const mainTrack = tracks.find(t => t.path === expectedMainTrackPath);
-    expect(mainTrack).toBeDefined();
-    expect(mainTrack?.title).toBe('Mock Song Title');
-
-    const expectedSubTrackPath = path.resolve('/fake/recursive/dir/subdir/sub_song.flac');
-    const subTrack = tracks.find(t => t.path === expectedSubTrackPath);
-    expect(subTrack).toBeDefined();
-    expect(subTrack?.title).toBe('Flac Title');
+    // 断言 (Assert)
+    expect(tracks).toHaveLength(3);
+    expect(fs.readdir).toHaveBeenCalledWith(rootDir, { withFileTypes: true });
+    expect(fs.readdir).toHaveBeenCalledWith(rockDir, { withFileTypes: true });
+    expect(fs.readdir).toHaveBeenCalledWith(popDir, { withFileTypes: true });
+    expect(mm.parseFile).toHaveBeenCalledWith(path.join(rootDir, 'song1.mp3'));
+    expect(mm.parseFile).toHaveBeenCalledWith(path.join(rockDir, 'song2.flac'));
+    expect(mm.parseFile).toHaveBeenCalledWith(path.join(popDir, 'song3.wav'));
   });
 
-  it('should use filename as title if metadata title is missing', async () => {
-    const mockDir = '/fake/missing/title/dir';
-    const files = ['no_title.mp3'];
-
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => createMockFileStat(false));
-    mockParseFile.mockResolvedValue(mockPartialMetadata); // Metadata with missing title
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(tracks.length).toBe(1);
-    expect(tracks[0].title).toBe('no_title'); // Should fallback to filename
-    expect(tracks[0].path).toBe(path.resolve('/fake/missing/title/dir/no_title.mp3'));
-    expect(tracks[0].artist).toBe('Partial Artist');
-    expect(tracks[0].album).toBe('Partial Album');
-    expect(tracks[0].duration).toBe(150);
-  });
-
-  it('should use "Unknown Artist" and "Unknown Album" if metadata is missing', async () => {
-    const mockDir = '/fake/unknown/metadata/dir';
-    const files = ['blank.mp3'];
-
-    const blankMetadata = {
-      common: { duration: 100 }, // Only duration available
-      format: { duration: 100 },
-    };
-
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => createMockFileStat(false));
-    mockParseFile.mockResolvedValue(blankMetadata);
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(tracks.length).toBe(1);
-    expect(tracks[0].title).toBe('blank'); // Fallback title
-    expect(tracks[0].artist).toBe('Unknown Artist'); // Default
-    expect(tracks[0].album).toBe('Unknown Album'); // Default
-    expect(tracks[0].duration).toBe(100);
-  });
-
-  // --- Failure Scenarios ---
-
-  it('should skip files that cause parseFile errors and log an error', async () => {
-    const mockDir = '/fake/error/parsing/dir';
-    const files = ['good.mp3', 'bad.mp3', 'another_good.flac'];
-
-    // Mock console.error to spy on it
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => createMockFileStat(false));
-
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === '/fake/error/parsing/dir/good.mp3') return Promise.resolve(mockMp3Metadata);
-      if (filePath === '/fake/error/parsing/dir/bad.mp3') return Promise.reject(new Error('Invalid MP3 format'));
-      if (filePath === '/fake/error/parsing/dir/another_good.flac') return Promise.resolve(mockFlacMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
+  it('should handle missing metadata tags by using fallback values', async () => {
+    const fakeDir = '/music/partial';
+    fs.readdir.mockResolvedValue([createDirent('song.mp3', 'file')]);
+    mm.parseFile.mockResolvedValue({
+      // 模拟一个只有部分标签的元数据对象
+      common: { artist: 'Just an Artist' },
+      format: { duration: 123 },
     });
 
-    const tracks = await scanDirectory(mockDir);
+    const tracks = await scanDirectory(fakeDir);
 
-    expect(mockParseFile).toHaveBeenCalledTimes(3);
-    expect(tracks.length).toBe(2); // Only good files should be in the result
-
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error parsing metadata for /fake/error/parsing/dir/bad.mp3: Invalid MP3 format');
-
-    consoleErrorSpy.mockRestore(); // Restore console.error
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].title).toBe('song.mp3'); // 回退到文件名
+    expect(tracks[0].artist).toBe('Just an Artist');
+    expect(tracks[0].album).toBe('Unknown Album'); // 回退到默认值
+    expect(tracks[0].duration).toBe(123);
   });
 
-  it('should skip entries that cause stat errors and log an error', async () => {
-    const mockDir = '/fake/error/stat/dir';
-    const files = ['valid_file.mp3', 'permission_denied.wav'];
+  // ===================================
+  // ===  边界与边缘情况 (Edge & Boundary Cases)  ===
+  // ===================================
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('should return an empty array for an empty directory', async () => {
+    const fakeDir = '/empty';
+    fs.readdir.mockResolvedValue([]);
 
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => {
-      if (filePath === '/fake/error/stat/dir/valid_file.mp3') return createMockFileStat(false);
-      if (filePath === '/fake/error/stat/dir/permission_denied.wav') return Promise.reject(new Error('Permission denied'));
-      return Promise.reject(new Error(`Stat not mocked for ${filePath}`));
-    });
+    const tracks = await scanDirectory(fakeDir);
 
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === '/fake/error/stat/dir/valid_file.mp3') return Promise.resolve(mockMp3Metadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
-    });
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockStat).toHaveBeenCalledTimes(2);
-    expect(mockParseFile).toHaveBeenCalledTimes(1); // Only called for valid_file.mp3
-    expect(tracks.length).toBe(1);
-
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error getting stats for /fake/error/stat/dir/permission_denied.wav: Permission denied');
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('should return an empty array and log an error if the directory does not exist', async () => {
-    const mockDir = '/fake/non/existent/dir';
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    // Mock readdir to reject with an error indicating directory not found
-    mockReaddir.mockRejectedValue(new Error(`ENOENT: no such file or directory, scandir '${mockDir}'`));
-
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockStat).not.toHaveBeenCalled();
-    expect(mockParseFile).not.toHaveBeenCalled();
     expect(tracks).toEqual([]);
-
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(`Error reading directory ${mockDir}: ENOENT: no such file or directory, scandir '${mockDir}'`);
-
-    consoleErrorSpy.mockRestore();
+    expect(mm.parseFile).not.toHaveBeenCalled();
   });
 
-  it('should return an empty array and log an error for permission denied on directory', async () => {
-    const mockDir = '/fake/no/permission/dir';
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('should return an empty array for a directory with only unsupported files', async () => {
+    const fakeDir = '/no-music';
+    fs.readdir.mockResolvedValue([createDirent('image.png', 'file'), createDirent('document.pdf', 'file')]);
 
-    // Mock readdir to reject with a permission denied error
-    mockReaddir.mockRejectedValue(new Error(`EACCES: permission denied, scandir '${mockDir}'`));
+    const tracks = await scanDirectory(fakeDir);
 
-    const tracks = await scanDirectory(mockDir);
-
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockStat).not.toHaveBeenCalled();
-    expect(mockParseFile).not.toHaveBeenCalled();
     expect(tracks).toEqual([]);
-
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(`Error reading directory ${mockDir}: EACCES: permission denied, scandir '${mockDir}'`);
-
-    consoleErrorSpy.mockRestore();
+    expect(mm.parseFile).not.toHaveBeenCalled();
   });
 
-  it('should handle a mix of supported, unsupported, and malformed files gracefully', async () => {
-    const mockDir = '/fake/mixed/dir';
-    const files = ['song1.mp3', 'song2.flac', 'unsupported.txt', 'corrupt.wav', 'song3.m4a'];
+  it('should return an empty array for a directory with only empty subdirectories', async () => {
+    const fakeDir = '/folders';
+    const subDir = path.join(fakeDir, 'empty_subdir');
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    mockReaddir.mockResolvedValue(files);
-    mockStat.mockImplementation((filePath) => createMockFileStat(false)); // All entries are files
-
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === '/fake/mixed/dir/song1.mp3') return Promise.resolve(mockMp3Metadata);
-      if (filePath === '/fake/mixed/dir/song2.flac') return Promise.resolve(mockFlacMetadata);
-      if (filePath === '/fake/mixed/dir/corrupt.wav') return Promise.reject(new Error('Malformed WAV data'));
-      if (filePath === '/fake/mixed/dir/song3.m4a') return Promise.resolve(mockM4aMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
+    fs.readdir.mockImplementation(async (dirPath: string) => {
+        if (dirPath === fakeDir) return [createDirent('empty_subdir', 'dir')];
+        if (dirPath === subDir) return []; // 子目录是空的
+        return [];
     });
 
-    const tracks = await scanDirectory(mockDir);
+    const tracks = await scanDirectory(fakeDir);
 
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockStat).toHaveBeenCalledTimes(files.length);
-    expect(mockParseFile).toHaveBeenCalledTimes(4); // Called for mp3, flac, corrupt.wav, m4a
-    expect(tracks.length).toBe(3); // unsupported.txt is skipped, corrupt.wav causes an error
-
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error parsing metadata for /fake/mixed/dir/corrupt.wav: Malformed WAV data');
-
-    consoleErrorSpy.mockRestore();
+    expect(tracks).toEqual([]);
+    expect(mm.parseFile).not.toHaveBeenCalled();
   });
 
-  // Test recursion with subdirectories containing errors
-  it('should recursively scan subdirectories and handle errors within them', async () => {
-    const mockDir = '/fake/recursive/errors';
-    const subDir = 'sub';
-    const files = ['main_good.mp3', subDir]; // main_good.mp3 and a subdirectory
+  it('should handle deeply nested directories correctly', async () => {
+    const L1 = '/L1';
+    const L2 = path.join(L1, 'L2');
+    const L3 = path.join(L2, 'L3');
 
-    const subDirFiles = ['sub_bad.flac', 'sub_good.wav'];
-
-    // Mock readdir for the main directory
-    mockReaddir.mockImplementation((dirPath) => {
-      if (dirPath === mockDir) return Promise.resolve(files);
-      if (dirPath === path.join(mockDir, subDir)) return Promise.resolve(subDirFiles);
-      return Promise.reject(new Error(`readdir not mocked for ${dirPath}`));
+    fs.readdir.mockImplementation(async (p: string) => {
+      if (p === L1) return [createDirent('L2', 'dir')];
+      if (p === L2) return [createDirent('L3', 'dir')];
+      if (p === L3) return [createDirent('deep-song.m4a', 'file')];
+      return [];
     });
 
-    // Mock stat for entries
-    mockStat.mockImplementation((filePath) => {
-      if (filePath === path.join(mockDir, 'main_good.mp3')) return createMockFileStat(false);
-      if (filePath === path.join(mockDir, subDir)) return createMockFileStat(true); // Directory
-      if (filePath === path.join(mockDir, subDir, 'sub_bad.flac')) return createMockFileStat(false);
-      if (filePath === path.join(mockDir, subDir, 'sub_good.wav')) return createMockFileStat(false);
-      return Promise.reject(new Error(`Stat not mocked for ${filePath}`));
+    mm.parseFile.mockResolvedValue(mockMetadata('Deep Song'));
+    
+    const tracks = await scanDirectory(L1);
+
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].path).toBe(path.join(L3, 'deep-song.m4a'));
+  });
+
+  // ===================================
+  // === 失败与错误处理 (Failure & Error Handling) ===
+  // ===================================
+
+  it('should return an empty array and log error if the root directory cannot be read', async () => {
+    const fakeDir = '/non-existent';
+    const error = new Error('ENOENT: no such file or directory');
+    fs.readdir.mockRejectedValue(error);
+
+    const tracks = await scanDirectory(fakeDir);
+
+    expect(tracks).toEqual([]);
+    expect(console.error).toHaveBeenCalledWith(`Error reading directory ${fakeDir}:`, error);
+  });
+
+  it('should skip a file and log error if metadata parsing fails', async () => {
+    const fakeDir = '/corrupted';
+    const badFile = path.join(fakeDir, 'bad.flac');
+    const parseError = new Error('Corrupted metadata');
+    
+    fs.readdir.mockResolvedValue([
+        createDirent('good.mp3', 'file'),
+        createDirent('bad.flac', 'file')
+    ]);
+    
+    mm.parseFile.mockImplementation(async (filePath: string) => {
+      if (filePath === badFile) throw parseError;
+      return mockMetadata('Good Song');
     });
 
-    // Mock parseFile for audio files
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tracks = await scanDirectory(fakeDir);
 
-    mockParseFile.mockImplementation((filePath) => {
-      if (filePath === path.join(mockDir, 'main_good.mp3')) return Promise.resolve(mockMp3Metadata);
-      if (filePath === path.join(mockDir, subDir, 'sub_bad.flac')) return Promise.reject(new Error('Corrupt FLAC'));
-      if (filePath === path.join(mockDir, subDir, 'sub_good.wav')) return Promise.resolve(mockWavMetadata);
-      return Promise.reject(new Error(`ParseFile not mocked for ${filePath}`));
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].title).toBe('Good Song');
+    expect(console.error).toHaveBeenCalledWith(`Error reading metadata for ${badFile}:`, parseError);
+  });
+
+  it('should skip a subdirectory and log error if it cannot be read, but continue with others', async () => {
+    const rootDir = '/mixed-permissions';
+    const goodDir = path.join(rootDir, 'good');
+    const badDir = path.join(rootDir, 'bad');
+    const accessError = new Error('EACCES: permission denied');
+
+    fs.readdir.mockImplementation(async (dirPath: string) => {
+      if (dirPath === rootDir) return [createDirent('root.mp3', 'file'), createDirent('good', 'dir'), createDirent('bad', 'dir')];
+      if (dirPath === goodDir) return [createDirent('good-song.wav', 'file')];
+      if (dirPath === badDir) throw accessError; // 此目录读取失败
+      return [];
     });
 
-    const tracks = await scanDirectory(mockDir);
+    mm.parseFile.mockResolvedValue(mockMetadata('A Song'));
 
-    expect(mockReaddir).toHaveBeenCalledWith(mockDir);
-    expect(mockReaddir).toHaveBeenCalledWith(path.join(mockDir, subDir));
-    expect(mockStat).toHaveBeenCalledTimes(4); // 1 for main_good, 1 for sub dir, 1 for sub_bad, 1 for sub_good
-    expect(mockParseFile).toHaveBeenCalledTimes(3); // main_good, sub_bad, sub_good
-    expect(tracks.length).toBe(2); // main_good and sub_good
+    const tracks = await scanDirectory(rootDir);
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Error parsing metadata for /fake/recursive/errors/subdir/sub_bad.flac: Corrupt FLAC');
-
-    consoleErrorSpy.mockRestore();
+    expect(tracks).toHaveLength(2); // root.mp3 和 good-song.wav
+    expect(mm.parseFile).toHaveBeenCalledTimes(2);
+    expect(console.error).toHaveBeenCalledWith(`Error reading directory ${badDir}:`, accessError);
   });
 });

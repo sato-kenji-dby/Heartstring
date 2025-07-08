@@ -1,0 +1,102 @@
+# PlayerService 开发文档
+
+## 概述
+
+`PlayerService` 是一个核心服务，负责管理音频播放。它使用 `ffplay` 作为底层播放器，并提供了一系列方法来控制播放状态（播放、停止、暂停、恢复）以及查询当前播放信息。该服务还通过事件机制通知外部组件播放状态的变化。
+
+## 核心功能
+
+### 1. 播放控制
+
+#### `play(track: Track, startTime: number = 0): void`
+
+*   **描述**: 开始播放指定的音轨。如果当前有音轨正在播放，它会先停止当前播放，然后开始新的播放。
+*   **参数**:
+    *   `track`: `Track` 类型，表示要播放的音轨对象，包含 `id`, `path`, `title`, `artist`, `album`, `duration` 等信息。
+    *   `startTime`: `number` (可选，默认为 `0`)，表示从音轨的哪个时间点开始播放（单位：秒）。
+*   **行为**:
+    *   启动一个 `ffplay` 子进程来播放音频。
+    *   设置 `currentTrack` 为当前播放的音轨。
+    *   重置 `isPaused` 为 `false`。
+    *   设置 `pausedTime` 为 `startTime`。
+    *   发射 `playback-started` 事件。
+
+#### `stop(): void`
+
+*   **描述**: 停止当前正在播放的音轨，并重置播放器状态。
+*   **行为**:
+    *   如果 `ffplay` 进程存在，强制终止它 (`SIGKILL`)。
+    *   重置 `ffplayProcess`, `currentTrack`, `pausedTime`, `isPaused` 为初始状态。
+
+#### `pause(): void`
+
+*   **描述**: 暂停当前正在播放的音轨。
+*   **行为**:
+    *   如果 `ffplay` 进程存在且未暂停，向 `ffplay` 进程的 `stdin` 写入 `'p'` 命令以暂停播放。
+    *   设置 `isPaused` 为 `true`。
+    *   发射 `playback-paused` 事件，包含当前的 `currentTime`。
+
+#### `resume(): void`
+
+*   **描述**: 恢复当前暂停的音轨。
+*   **行为**:
+    *   如果 `ffplay` 进程存在且处于暂停状态，向 `ffplay` 进程的 `stdin` 写入 `'p'` 命令以恢复播放。
+    *   设置 `isPaused` 为 `false`。
+    *   发射 `playback-resumed` 事件，包含当前的 `currentTime`。
+    *   **注意**: 如果 `ffplay` 进程已关闭（例如，由于错误或被 `stop()` 终止），且 `currentTrack` 和 `pausedTime` 仍有值（这通常发生在非正常退出但未被完全重置的情况下），此方法会尝试从 `pausedTime` 重新启动播放。然而，根据设计意图，进程关闭后所有状态都会重置，因此此分支可能不会被实际触发。
+
+### 2. 状态查询
+
+#### `getCurrentTrack(): Track | null`
+
+*   **描述**: 获取当前正在播放的音轨对象。
+*   **返回值**: `Track` 对象或 `null`（如果没有音轨正在播放）。
+
+#### `getPausedTime(): number`
+
+*   **描述**: 获取当前播放的音轨已播放的时间（或暂停时的时间）。
+*   **返回值**: `number`，单位为秒。
+
+#### `getIsPaused(): boolean`
+
+*   **描述**: 查询播放器是否处于暂停状态。
+*   **返回值**: `boolean`，`true` 表示暂停，`false` 表示正在播放或未播放。
+
+## 事件
+
+`PlayerService` 通过 `on` 方法提供事件监听机制，允许外部组件响应播放状态的变化。
+
+#### `on<K extends keyof PlayerServiceEvents>(eventName: K, listener: PlayerServiceEvents[K]): void`
+
+*   **描述**: 注册一个事件监听器。
+*   **参数**:
+    *   `eventName`: 事件名称，可以是以下之一。
+    *   `listener`: 事件发生时要调用的回调函数。
+
+### 可用事件列表
+
+*   **`playback-started`**:
+    *   **触发时机**: 开始播放新音轨时。
+    *   **回调参数**: `(track: Track)`，当前播放的音轨对象。
+*   **`playback-progress`**:
+    *   **触发时机**: 播放过程中，`ffplay` 输出进度信息时。
+    *   **回调参数**: `(data: { currentTime: number; duration: number })`，包含当前播放时间（秒）和音轨总时长（秒）。
+*   **`playback-ended`**:
+    *   **触发时机**: 音轨正常播放结束时（`ffplay` 进程以代码 `0` 退出）。
+    *   **回调参数**: 无。
+*   **`playback-error`**:
+    *   **触发时机**: 播放过程中发生错误时（例如 `ffplay` 进程异常退出，或无法启动）。
+    *   **回调参数**: `(error: Error)`，包含错误信息的 `Error` 对象。
+*   **`playback-paused`**:
+    *   **触发时机**: 播放器进入暂停状态时。
+    *   **回调参数**: `(data: { currentTime: number })`，包含暂停时的当前播放时间（秒）。
+*   **`playback-resumed`**:
+    *   **触发时机**: 播放器从暂停状态恢复时。
+    *   **回调参数**: `(data: { currentTime: number })`，包含恢复时的当前播放时间（秒）。
+
+## 内部实现细节
+
+*   **`ffplay`**: 依赖于系统上安装的 `ffplay` 可执行文件。
+*   **进程通信**: 通过监听 `ffplay` 进程的 `stderr` 输出解析播放进度，通过 `stdin` 发送控制命令（如暂停/恢复）。
+*   **状态管理**: 内部维护 `currentTrack`, `pausedTime`, `isPaused` 等状态变量。
+*   **错误处理**: 捕获 `ffplay` 进程的错误和非零退出码，并通过 `playback-error` 事件通知。
