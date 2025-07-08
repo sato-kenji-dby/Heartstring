@@ -72,7 +72,6 @@ export class AudioService {
       playerStore.update(state => ({
         ...state,
         isPlaying: false,
-        status: 'stopped',
         progress: 0,
         currentTrack: null,
       }));
