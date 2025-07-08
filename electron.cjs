@@ -37,7 +37,8 @@ let libraryService; // 文件库服务实例
 
 try {
     const MusicDatabase = require('./dist-electron/src/services/database/database.cjs').default;
-    const { scanDirectory } = require('./dist-electron/src/services/library/LibraryService.cjs');
+    const LibraryServiceModule = require('./dist-electron/src/services/library/LibraryService.cjs'); // 导入整个模块
+    const scanDirectory = LibraryServiceModule.scanDirectory || LibraryServiceModule.default?.scanDirectory; // 尝试从模块或其 default 属性中获取 scanDirectory
     const { PlayerService } = require('./dist-electron/src/core/player/PlayerService.cjs');
     const { AudioService } = require('./dist-electron/src/services/audio/AudioService.cjs'); // 导入 AudioService
 
@@ -64,11 +65,23 @@ function registerIpcHandlers() {
             properties: ['openDirectory'],
         });
         if (canceled || !filePaths || filePaths.length === 0) {
+            console.log('[Main Process] Directory selection canceled or no path selected.');
             return [];
         }
 
-        const tracks = await scanDirectory(filePaths[0]);
-        db.insertTracks(tracks);
+        const selectedPath = filePaths[0];
+        console.log(`[Main Process] Selected directory: ${selectedPath}`);
+
+        const tracks = await scanDirectory(selectedPath);
+        console.log(`[Main Process] Found ${tracks.length} tracks.`);
+
+        if (tracks.length > 0) {
+            db.insertTracks(tracks);
+            console.log('[Main Process] Tracks inserted into database.');
+        } else {
+            console.log('[Main Process] No tracks found to insert.');
+        }
+        
         return tracks;
     });
 

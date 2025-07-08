@@ -23,6 +23,18 @@
   }
 
   onMount(async () => {
+    // 等待 window.electronAPI 可用
+    await new Promise<void>(resolve => {
+      const checkApi = () => {
+        if (window.electronAPI && window.audio) {
+          resolve();
+        } else {
+          setTimeout(checkApi, 50); // 每 50ms 检查一次
+        }
+      };
+      checkApi();
+    });
+
     await fetchTracks();
     console.log('Page mounted and tracks fetched.');
   });

@@ -1,16 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Track } from './src/types'; // 导入 Track 类型
 
-contextBridge.exposeInMainWorld('electron', {
-  ipcRenderer: {
-    send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
-    on: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.on(channel, listener),
-    off: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.off(channel, listener),
-    invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
-  },
+console.log('[Preload] Preload script started.');
+
+contextBridge.exposeInMainWorld('electronAPI', { // 将 'electron' 改为 'electronAPI'
   openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
   getAllTracks: () => ipcRenderer.invoke('get-all-tracks'),
 });
+
+contextBridge.exposeInMainWorld('ipcRenderer', { // 直接暴露 ipcRenderer
+  send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+  on: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.on(channel, listener),
+  off: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.off(channel, listener),
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+});
+
+console.log('[Preload] "electronAPI" and "ipcRenderer" exposed.');
 
 // 暴露 window.audio API
 contextBridge.exposeInMainWorld('audio', {

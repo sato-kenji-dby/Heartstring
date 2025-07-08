@@ -37,9 +37,17 @@ declare global {
     onPlaybackResumed: (callback: (data: { currentTime: number }) => void) => Electron.IpcRenderer; // 新增：播放恢复事件
   }
 
+  interface IpcRendererAPI {
+    send: (channel: string, ...args: any[]) => void;
+    on: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
+    off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
+    invoke: (channel: string, ...args: any[]) => Promise<any>;
+  }
+
   interface Window {
     electronAPI: ElectronAPI;
     audio: AudioAPI;
+    ipcRenderer: IpcRendererAPI; // 添加 ipcRenderer
   }
 
 	namespace App {
