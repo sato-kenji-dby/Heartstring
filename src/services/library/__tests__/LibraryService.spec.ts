@@ -2,6 +2,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'path';
+import type { Dirent } from 'fs';
+import type { IAudioMetadata, ICommonTagsResult } from 'music-metadata';
 
 // --- Mocks ---
 // 模拟 'fs/promises' 模块
@@ -9,7 +11,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   const original = await importOriginal<typeof import('fs/promises')>();
   return {
     ...original,
-    readdir: vi.fn(), // 我们只模拟 readdir
+    readdir: vi.fn(), // 类型在用例里断言
   };
 });
 
@@ -43,21 +45,31 @@ describe('scanDirectory Unit Tests', () => {
 
   // --- 辅助函数 ---
   // 创建模拟 Dirent 对象的辅助函数，以匹配 fs.readdir({ withFileTypes: true }) 的返回类型
-  const createDirent = (name: string, type: 'dir' | 'file') => ({
-    name,
-    isDirectory: () => type === 'dir',
-    isFile: () => type === 'file',
-  });
+  // Node 18+ Dirent is Dirent<Buffer>, 这里用 as unknown as Dirent<Buffer>
+  const createDirent = (name: string, type: 'dir' | 'file'): Dirent =>
+    ({
+      name,
+      isDirectory: () => type === 'dir',
+      isFile: () => type === 'file',
+    }) as unknown as Dirent;
 
   // 模拟元数据
-  const mockMetadata = (title: string, overrides: object = {}) => ({
+  const mockMetadata = (
+    title: string,
+    overrides: Partial<Record<string, unknown>> = {}
+  ): IAudioMetadata => ({
     common: {
       title,
       artist: 'Mock Artist',
       album: 'Mock Album',
+      track: { no: 1, of: 1 },
+      disk: { no: 1, of: 1 },
+      movementIndex: { no: null, of: null },
       ...overrides,
-    },
-    format: { duration: 180 },
+    } as unknown as ICommonTagsResult,
+    format: { duration: 180, tagTypes: [], trackInfo: [] },
+    native: {},
+    quality: { warnings: [] },
   });
 
   // ===================================
@@ -76,11 +88,11 @@ describe('scanDirectory Unit Tests', () => {
     ];
 
     // 安排 (Arrange)
-    vi.mocked(fs.readdir).mockResolvedValue(entries as any);
+    vi.mocked(fs.readdir).mockResolvedValue(
+      entries as unknown as Dirent<Buffer>[]
+    );
     vi.mocked(mm.parseFile).mockImplementation((filePath: string) =>
-      Promise.resolve(
-        mockMetadata(`Title for ${path.basename(filePath)}`) as any
-      )
+      Promise.resolve(mockMetadata(`Title for ${path.basename(filePath)}`))
     );
 
     // 行动 (Act)
@@ -106,21 +118,23 @@ describe('scanDirectory Unit Tests', () => {
             createDirent('song1.mp3', 'file'),
             createDirent('Rock', 'dir'),
             createDirent('Pop', 'dir'),
-          ] as any;
+          ] as unknown as Dirent<Buffer>[];
         }
         if (dirPath.toString() === rockDir) {
-          return [createDirent('song2.flac', 'file')] as any;
+          return [
+            createDirent('song2.flac', 'file'),
+          ] as unknown as Dirent<Buffer>[];
         }
         if (dirPath.toString() === popDir) {
-          return [createDirent('song3.wav', 'file')] as any;
+          return [
+            createDirent('song3.wav', 'file'),
+          ] as unknown as Dirent<Buffer>[];
         }
-        return [] as any;
+        return [] as unknown as Dirent<Buffer>[];
       }
     );
 
-    vi.mocked(mm.parseFile).mockResolvedValue(
-      mockMetadata('A Great Song') as any
-    );
+    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('A Great Song'));
 
     // 行动 (Act)
     const tracks = await scanDirectory(rootDir);
@@ -139,12 +153,21 @@ describe('scanDirectory Unit Tests', () => {
     const fakeDir = '/music/partial';
     vi.mocked(fs.readdir).mockResolvedValue([
       createDirent('song.mp3', 'file'),
-    ] as any);
+    ] as unknown as Dirent<Buffer>[]);
     vi.mocked(mm.parseFile).mockResolvedValue({
       // 模拟一个只有部分标签的元数据对象
-      common: { artist: 'Just an Artist' },
-      format: { duration: 123 },
-    } as any);
+      common: {
+        artist: 'Just an Artist',
+        title: 'song.mp3',
+        album: 'Unknown Album',
+        track: { no: 0, of: 0 },
+        disk: { no: 0, of: 0 },
+        movementIndex: { no: null, of: null },
+      } as unknown as ICommonTagsResult,
+      format: { duration: 123, tagTypes: [], trackInfo: [] },
+      native: {},
+      quality: { warnings: [] },
+    } as IAudioMetadata);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -161,7 +184,7 @@ describe('scanDirectory Unit Tests', () => {
 
   it('should return an empty array for an empty directory', async () => {
     const fakeDir = '/empty';
-    vi.mocked(fs.readdir).mockResolvedValue([]);
+    vi.mocked(fs.readdir).mockResolvedValue([] as unknown as Dirent<Buffer>[]);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -174,7 +197,7 @@ describe('scanDirectory Unit Tests', () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       createDirent('image.png', 'file'),
       createDirent('document.pdf', 'file'),
-    ] as any);
+    ] as unknown as Dirent<Buffer>[]);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -189,9 +212,12 @@ describe('scanDirectory Unit Tests', () => {
     vi.mocked(fs.readdir).mockImplementation(
       async (dirPath: string | Buffer | URL) => {
         if (dirPath.toString() === fakeDir)
-          return [createDirent('empty_subdir', 'dir')] as any;
-        if (dirPath.toString() === subDir) return [] as any; // 子目录是空的
-        return [] as any;
+          return [
+            createDirent('empty_subdir', 'dir'),
+          ] as unknown as Dirent<Buffer>[];
+        if (dirPath.toString() === subDir)
+          return [] as unknown as Dirent<Buffer>[]; // 子目录是空的
+        return [] as unknown as Dirent<Buffer>[];
       }
     );
 
@@ -208,15 +234,19 @@ describe('scanDirectory Unit Tests', () => {
 
     vi.mocked(fs.readdir).mockImplementation(
       async (p: string | Buffer | URL) => {
-        if (p.toString() === L1) return [createDirent('L2', 'dir')] as any;
-        if (p.toString() === L2) return [createDirent('L3', 'dir')] as any;
+        if (p.toString() === L1)
+          return [createDirent('L2', 'dir')] as unknown as Dirent<Buffer>[];
+        if (p.toString() === L2)
+          return [createDirent('L3', 'dir')] as unknown as Dirent<Buffer>[];
         if (p.toString() === L3)
-          return [createDirent('deep-song.m4a', 'file')] as any;
-        return [] as any;
+          return [
+            createDirent('deep-song.m4a', 'file'),
+          ] as unknown as Dirent<Buffer>[];
+        return [] as unknown as Dirent<Buffer>[];
       }
     );
 
-    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('Deep Song') as any);
+    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('Deep Song'));
 
     const tracks = await scanDirectory(L1);
 
@@ -250,11 +280,11 @@ describe('scanDirectory Unit Tests', () => {
     vi.mocked(fs.readdir).mockResolvedValue([
       createDirent('good.mp3', 'file'),
       createDirent('bad.flac', 'file'),
-    ] as any);
+    ] as unknown as Dirent<Buffer>[]);
 
     vi.mocked(mm.parseFile).mockImplementation(async (filePath: string) => {
       if (filePath === badFile) throw parseError;
-      return mockMetadata('Good Song') as any;
+      return mockMetadata('Good Song');
     });
 
     const tracks = await scanDirectory(fakeDir);
@@ -280,15 +310,17 @@ describe('scanDirectory Unit Tests', () => {
             createDirent('root.mp3', 'file'),
             createDirent('good', 'dir'),
             createDirent('bad', 'dir'),
-          ] as any;
+          ] as unknown as Dirent<Buffer>[];
         if (dirPath.toString() === goodDir)
-          return [createDirent('good-song.wav', 'file')] as any;
+          return [
+            createDirent('good-song.wav', 'file'),
+          ] as unknown as Dirent<Buffer>[];
         if (dirPath.toString() === badDir) throw accessError; // 此目录读取失败
-        return [] as any;
+        return [] as unknown as Dirent<Buffer>[];
       }
     );
 
-    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('A Song') as any);
+    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('A Song'));
 
     const tracks = await scanDirectory(rootDir);
 

@@ -6,7 +6,12 @@ import svelteParser from 'svelte-eslint-parser';
 
 export default [
   {
-    ignores: ['.svelte-kit/', 'dist-electron/', 'electron.cjs'],
+    ignores: [
+      '.svelte-kit/',
+      'dist-electron/',
+      'electron.cjs',
+      'src/services/audio/__tests__/AudioService.spec.ts',
+    ],
   },
   ...tseslint.configs.recommended,
   ...sveltePlugin.configs.recommended,

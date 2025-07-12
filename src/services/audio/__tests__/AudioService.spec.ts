@@ -1,15 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AudioService } from '../AudioService';
-// import { get } from 'svelte/store'; // 移除对 svelte/store 的导入
-// import { EventEmitter } from 'events'; // 移除顶层导入
 import type { Track } from '$types';
-// import { playerStore } from "$stores/playerStore"; // 移除对 playerStore 的导入
-
-// --- Mocks ---
-// 模拟 PlayerService 模块
-import { EventEmitter } from 'events';
 
 vi.mock('$core/player/PlayerService', () => {
+  const { EventEmitter } = require('events');
   class MockPlayerService extends EventEmitter {
     play = vi.fn((track: Track) => {
       // 模拟播放开始，触发事件
