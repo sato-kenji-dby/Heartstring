@@ -2,7 +2,7 @@
 
 ## 概述
 
-`playerStore` 是一个 Svelte 可写存储（writable store），用于管理应用程序的全局播放器状态。它封装了当前播放的音轨、播放状态（播放中、暂停、停止、错误）、播放进度、总时长以及播放队列等信息。通过订阅此存储，应用程序的各个组件可以实时响应播放状态的变化，并更新其 UI。
+`playerStore` 是一个自定义 Svelte 存储，用于管理应用程序的全局播放器状态。它封装了与 Electron 主进程的 IPC（进程间通信）逻辑，负责发送播放控制命令并监听主进程发来的状态更新。通过订阅此存储，应用程序的各个组件可以实时响应播放状态的变化，并更新其 UI。
 
 ## 核心状态
 
@@ -88,49 +88,35 @@ import { playerStore } from '$stores/playerStore';
 {/if}
 ```
 
-### 3. 更新状态
+### 3. 公共方法 (IPC 命令)
 
-`playerStore` 是一个可写存储，因此可以通过其 `set` 或 `update` 方法来修改状态。通常，状态的更新会由 `PlayerService` 或其他核心逻辑服务负责，以确保状态的一致性。
+`playerStore` 暴露了一系列方法，用于向 Electron 主进程发送 IPC 命令，以控制播放器的行为。这些方法不直接修改存储的状态，而是通过 IPC 触发主进程的相应操作，主进程处理完成后会通过 `player-store-update` 事件将最新的状态发送回渲染进程，从而更新 `playerStore`。
 
-#### 使用 `set` (直接设置整个状态对象)
+#### `play(track: Track): void`
 
-```typescript
-import { playerStore } from '$stores/playerStore';
-import type { PlayerState } from '$types';
+*   **描述**: 请求主进程播放指定的音轨。
+*   **参数**:
+    *   `track`: `Track` 类型，表示要播放的音轨对象。
+*   **IPC 事件**: 发送 `play-track` 事件到主进程。
 
-// 假设 PlayerService 触发了播放开始事件
-function handlePlaybackStarted(track: Track) {
-  playerStore.set({
-    currentTrack: track,
-    isPlaying: true,
-    progress: 0,
-    duration: track.duration,
-    status: 'playing',
-    queue: [], // 根据实际情况更新队列
-  });
-}
-```
+#### `pause(): void`
 
-#### 使用 `update` (基于当前状态进行修改)
+*   **描述**: 请求主进程暂停当前播放。
+*   **IPC 事件**: 发送 `pause-playback` 事件到主进程。
 
-```typescript
-import { playerStore } from '$stores/playerStore';
+#### `resume(): void`
 
-// 假设 PlayerService 触发了播放进度更新事件
-function handlePlaybackProgress(currentTime: number) {
-  playerStore.update(state => ({
-    ...state,
-    progress: currentTime,
-  }));
-}
+*   **描述**: 请求主进程恢复当前暂停的播放。
+*   **IPC 事件**: 发送 `resume-playback` 事件到主进程。
 
-// 假设 PlayerService 触发了暂停事件
-function handlePlaybackPaused(currentTime: number) {
-  playerStore.update(state => ({
-    ...state,
-    isPlaying: false,
-    status: 'paused',
-    progress: currentTime,
-  }));
-}
-```
+#### `stop(): void`
+
+*   **描述**: 请求主进程停止当前播放。
+*   **IPC 事件**: 发送 `stop-playback` 事件到主进程。
+
+#### `addToQueue(track: Track): void`
+
+*   **描述**: 请求主进程将指定的音轨添加到播放队列。
+*   **参数**:
+    *   `track`: `Track` 类型，表示要添加到队列的音轨对象。
+*   **IPC 事件**: 发送 `add-to-queue` 事件到主进程。

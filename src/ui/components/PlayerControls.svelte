@@ -14,12 +14,9 @@
 
   function togglePlayPause() {
     if (playerState.isPlaying) {
-      window.audio.pause();
-    } else if (playerState.status === 'paused' && playerState.currentTrack) {
-      window.audio.resume();
-    } else if (playerState.currentTrack) {
-      // If stopped and a track is available, play it (this might need more sophisticated logic later)
-      window.audio.play(playerState.currentTrack);
+      playerStore.pause();
+    } else {
+      playerStore.resume();
     }
   }
 </script>

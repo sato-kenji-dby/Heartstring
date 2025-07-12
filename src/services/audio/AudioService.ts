@@ -31,12 +31,13 @@ export class AudioService {
     });
 
     this.playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
+      console.log(`[AudioService] Received playback-progress: currentTime=${currentTime}, duration=${duration}`); // 添加日志
       if (this.sendToRenderer) {
         this.sendToRenderer('player-store-update', {
           progress: currentTime,
           duration: duration > 0 ? duration : undefined,
         });
-        this.sendToRenderer('playback-progress', { currentTime, duration });
+        this.sendToRenderer('playback-progress', { currentTime, duration }); // 也可以保留这个，用于更细粒度的监听
       }
     });
 

@@ -15,18 +15,18 @@
   }
 
   async function playTrack(track: Track) {
-    window.audio.play(track);
+    playerStore.play(track);
   }
 
   async function addToQueue(track: Track) {
-    window.audio.addToQueue(track);
+    playerStore.addToQueue(track);
   }
 
   onMount(async () => {
     // 等待 window.electronAPI 可用
     await new Promise<void>(resolve => {
       const checkApi = () => {
-        if (window.electronAPI && window.audio) {
+        if (window.electronAPI) {
           resolve();
         } else {
           setTimeout(checkApi, 50); // 每 50ms 检查一次

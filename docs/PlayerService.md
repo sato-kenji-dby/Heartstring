@@ -32,18 +32,18 @@
 
 *   **描述**: 暂停当前正在播放的音轨。
 *   **行为**:
-    *   如果 `ffplay` 进程存在且未暂停，向 `ffplay` 进程的 `stdin` 写入 `'p'` 命令以暂停播放。
+    *   如果 `ffplay` 进程存在，强制终止它 (`SIGKILL`)。
     *   设置 `isPaused` 为 `true`。
     *   发射 `playback-paused` 事件，包含当前的 `currentTime`。
+    *   **注意**: 进程被杀死后，`currentTrack` 和 `pausedTime` 会被保留，以便后续恢复播放。
 
 #### `resume(): void`
 
 *   **描述**: 恢复当前暂停的音轨。
 *   **行为**:
-    *   如果 `ffplay` 进程存在且处于暂停状态，向 `ffplay` 进程的 `stdin` 写入 `'p'` 命令以恢复播放。
-    *   设置 `isPaused` 为 `false`。
-    *   发射 `playback-resumed` 事件，包含当前的 `currentTime`。
-    *   **注意**: 如果 `ffplay` 进程已关闭（例如，由于错误或被 `stop()` 终止），且 `currentTrack` 和 `pausedTime` 仍有值（这通常发生在非正常退出但未被完全重置的情况下），此方法会尝试从 `pausedTime` 重新启动播放。然而，根据设计意图，进程关闭后所有状态都会重置，因此此分支可能不会被实际触发。
+    *   如果 `currentTrack` 存在且播放器处于暂停状态，将 `isPaused` 设置为 `false`，并调用 `play()` 方法从 `pausedTime` 重新启动 `ffplay` 进程。
+    *   发射 `playback-resumed` 事件，包含恢复时的 `currentTime`。
+    *   **注意**: 如果没有可恢复的音轨或播放器未处于暂停状态，将会在控制台输出日志。
 
 ### 2. 状态查询
 
@@ -97,6 +97,7 @@
 ## 内部实现细节
 
 *   **`ffplay`**: 依赖于系统上安装的 `ffplay` 可执行文件。
-*   **进程通信**: 通过监听 `ffplay` 进程的 `stderr` 输出解析播放进度，通过 `stdin` 发送控制命令（如暂停/恢复）。
-*   **状态管理**: 内部维护 `currentTrack`, `pausedTime`, `isPaused` 等状态变量。
+*   **进程通信**: 通过监听 `ffplay` 进程的 `stderr` 输出解析播放进度。暂停和恢复功能通过杀死并重新启动 `ffplay` 进程实现。
+*   **`ffplay` 参数**: `ffplay` 启动时使用 `-stats` 参数来确保输出播放统计信息，以便 `PlayerService` 能够捕获并更新播放进度。
+*   **状态管理**: 内部维护 `currentTrack`, `pausedTime`, `isPaused` 等状态变量。在暂停时，`currentTrack` 和 `pausedTime` 会被保留。
 *   **错误处理**: 捕获 `ffplay` 进程的错误和非零退出码，并通过 `playback-error` 事件通知。
