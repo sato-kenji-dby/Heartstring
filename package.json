@@ -11,10 +11,20 @@
       "output": "release"
     },
     "files": [
-      "dist-electron/**/*",
-      "dist/**/*",
-      "node_modules/**/*",
-      "package.json"
+      "**/*",
+      "!**/*.ts",
+      "!*.github",
+      "!LICENSE",
+      "!README.md",
+      "!src/",
+      "!.vscode/",
+      "!vite.*.ts",
+      "!vitest.*.ts",
+      "!svelte.config.js",
+      "!tailwind.config.js",
+      "!tsconfig.json",
+      "!.npmrc",
+      "!.eslintrc.*.cjs"
     ]
   },
   "scripts": {
