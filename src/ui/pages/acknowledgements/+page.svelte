@@ -83,7 +83,7 @@
     <p class="text-center text-red-500">加载许可证信息失败: {error}</p>
   {:else if Object.keys(licenses).length > 0}
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {#each Object.entries(licenses) as [packageName, info]}
+      {#each Object.entries(licenses) as [packageName, info] (packageName)}
         <div class="rounded-lg bg-slate-800 p-6 shadow-lg">
           <h2 class="mb-2 text-2xl font-semibold text-blue-300">
             {packageName}
