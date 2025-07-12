@@ -4,6 +4,19 @@
   "version": "0.1.0alpha",
   "main": "electron.cjs",
   "type": "module",
+  "build": {
+    "appId": "com.you.heartstring",
+    "productName": "Heartstring",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ]
+  },
   "scripts": {
     "lint": "prettier --check . && eslint .",
     "lint:fix": "prettier --write . && eslint --fix .",
