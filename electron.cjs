@@ -48,6 +48,7 @@ function createWindow() {
       preload: path.join(__dirname, 'dist-electron/preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: false, //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     },
   });
 
