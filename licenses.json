@@ -1,26 +1,26 @@
 {
-    "better-sqlite3@12.2.0": {
-        "licenses": "MIT",
-        "repository": "https://github.com/WiseLibs/better-sqlite3",
-        "licenseUrl": "https://github.com/WiseLibs/better-sqlite3/raw/master/LICENSE",
-        "parents": "heartstring"
-    },
-    "lucide-svelte@0.525.0": {
-        "licenses": "ISC",
-        "repository": "https://github.com/lucide-icons/lucide",
-        "licenseUrl": "https://github.com/lucide-icons/lucide/raw/master/LICENSE",
-        "parents": "heartstring"
-    },
-    "music-metadata@11.6.0": {
-        "licenses": "MIT",
-        "repository": "github:Borewit/music-metadata",
-        "licenseUrl": "github:Borewit/music-metadata",
-        "parents": "heartstring"
-    },
-    "play-sound@1.1.6": {
-        "licenses": "MIT",
-        "repository": "https://github.com/shime/play-sound",
-        "licenseUrl": "https://github.com/shime/play-sound/raw/master/LICENSE",
-        "parents": "heartstring"
-    }
+  "better-sqlite3@12.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/WiseLibs/better-sqlite3",
+    "licenseUrl": "https://github.com/WiseLibs/better-sqlite3/raw/master/LICENSE",
+    "parents": "heartstring"
+  },
+  "lucide-svelte@0.525.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/lucide-icons/lucide",
+    "licenseUrl": "https://github.com/lucide-icons/lucide/raw/master/LICENSE",
+    "parents": "heartstring"
+  },
+  "music-metadata@11.6.0": {
+    "licenses": "MIT",
+    "repository": "github:Borewit/music-metadata",
+    "licenseUrl": "github:Borewit/music-metadata",
+    "parents": "heartstring"
+  },
+  "play-sound@1.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/shime/play-sound",
+    "licenseUrl": "https://github.com/shime/play-sound/raw/master/LICENSE",
+    "parents": "heartstring"
+  }
 }

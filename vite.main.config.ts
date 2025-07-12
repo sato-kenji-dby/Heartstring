@@ -38,12 +38,12 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '$api': resolve(__dirname, 'src/api'),
-      '$core': resolve(__dirname, 'src/core'),
-      '$services': resolve(__dirname, 'src/services'),
-      '$stores': resolve(__dirname, 'src/stores'),
-      '$ui': resolve(__dirname, 'src/ui'),
-      '$types': resolve(__dirname, 'src/types'),
+      $api: resolve(__dirname, 'src/api'),
+      $core: resolve(__dirname, 'src/core'),
+      $services: resolve(__dirname, 'src/services'),
+      $stores: resolve(__dirname, 'src/stores'),
+      $ui: resolve(__dirname, 'src/ui'),
+      $types: resolve(__dirname, 'src/types'),
     },
   },
 });

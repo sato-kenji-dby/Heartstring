@@ -81,10 +81,12 @@ describe('PlayerService Unit Tests', () => {
   beforeEach(() => {
     playerService = new PlayerService();
     mockProcess = createMockProcess();
-    
+
     // 模拟 spawn 返回我们的可控 mock 进程
     // 使用类型断言是合理的，因为我们确保 mock 对象满足 PlayerService 在运行时所需的所有接口。
-    mockedSpawn.mockReturnValue(mockProcess as unknown as ChildProcessWithoutNullStreams);
+    mockedSpawn.mockReturnValue(
+      mockProcess as unknown as ChildProcessWithoutNullStreams
+    );
 
     // 监控 console.error，以便验证错误日志，同时保持测试输出干净
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -100,7 +102,8 @@ describe('PlayerService Unit Tests', () => {
   // ===================================
 
   describe('play()', () => {
-    it('should spawn ffplay with correct arguments and emit "playback-started"', async () => { // 标记为 async
+    it('should spawn ffplay with correct arguments and emit "playback-started"', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const startedSpy = vi.fn();
       playerService.on('playback-started', startedSpy);
@@ -111,10 +114,15 @@ describe('PlayerService Unit Tests', () => {
       // 断言 (Assert)
       expect(mockedSpawn).toHaveBeenCalledTimes(1);
       expect(mockedSpawn).toHaveBeenCalledWith('ffplay', [
-        '-i', mockTrack.path,
-        '-ss', '0', // 总是包含 -ss 0
-        '-nodisp', '-autoexit', '-stats',
-        '-af', 'volume=1.0'
+        '-i',
+        mockTrack.path,
+        '-ss',
+        '0', // 总是包含 -ss 0
+        '-nodisp',
+        '-autoexit',
+        '-stats',
+        '-af',
+        'volume=1.0',
       ]);
 
       expect(startedSpy).toHaveBeenCalledTimes(1);
@@ -123,7 +131,8 @@ describe('PlayerService Unit Tests', () => {
       expect(playerService.getIsPaused()).toBe(false);
     });
 
-    it('should spawn ffplay with -ss argument when startTime is provided', async () => { // 标记为 async
+    it('should spawn ffplay with -ss argument when startTime is provided', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const startTime = 30;
 
@@ -132,32 +141,39 @@ describe('PlayerService Unit Tests', () => {
 
       // 断言 (Assert)
       expect(mockedSpawn).toHaveBeenCalledWith('ffplay', [
-        '-i', mockTrack.path,
-        '-ss', String(startTime), // 确保顺序正确
-        '-nodisp', '-autoexit', '-stats',
-        '-af', 'volume=1.0'
+        '-i',
+        mockTrack.path,
+        '-ss',
+        String(startTime), // 确保顺序正确
+        '-nodisp',
+        '-autoexit',
+        '-stats',
+        '-af',
+        'volume=1.0',
       ]);
     });
 
-    it('should stop any existing playback before starting a new track', async () => { // 标记为 async
+    it('should stop any existing playback before starting a new track', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const newTrack = { ...mockTrack, id: 2, path: '/path/to/another.flac' };
-      
+
       // 第一次播放
-      await playerService.play(mockTrack); 
+      await playerService.play(mockTrack);
       const firstProcessKillSpy = mockProcess.kill; // 获取第一次播放进程的 kill spy
 
       // 模拟第一次播放的进程关闭，以便 play() 方法中的 await stop() 能够完成
       // 这一步必须在第二次 play 调用之前，因为第二次 play 内部会 await stop()
-      
 
       const secondMockProcess = createMockProcess();
-      mockedSpawn.mockReturnValueOnce(secondMockProcess as unknown as ChildProcessWithoutNullStreams);
+      mockedSpawn.mockReturnValueOnce(
+        secondMockProcess as unknown as ChildProcessWithoutNullStreams
+      );
 
       // 行动 (Act)
       await playerService.play(newTrack); // 第二次播放，这会触发对旧进程的 stop() 调用
 
-      mockProcess.triggerClose(null); 
+      mockProcess.triggerClose(null);
       // 断言 (Assert)
       expect(firstProcessKillSpy).toHaveBeenCalledTimes(1); // 第一次播放的进程被 kill
       expect(mockedSpawn).toHaveBeenCalledTimes(2); // spawn 被调用了两次
@@ -170,7 +186,8 @@ describe('PlayerService Unit Tests', () => {
   // ===================================
 
   describe('stop()', () => {
-    it('should kill the process and reset all state when a track is playing', async () => { // 标记为 async
+    it('should kill the process and reset all state when a track is playing', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       await playerService.play(mockTrack); // 确保播放器处于播放状态
 
@@ -186,9 +203,10 @@ describe('PlayerService Unit Tests', () => {
       expect(playerService.getIsPaused()).toBe(false);
     });
 
-    it('should do nothing if no track is playing', async () => { // 标记为 async
+    it('should do nothing if no track is playing', async () => {
+      // 标记为 async
       // 安排 (Arrange) - 默认状态下没有播放
-      
+
       // 行动 (Act)
       await playerService.stop(); // 等待 stop Promise 解析
 
@@ -198,7 +216,8 @@ describe('PlayerService Unit Tests', () => {
   });
 
   describe('pause()', () => {
-    it('should kill the ffplay process, update state, and emit "playback-paused" when playing', async () => { // 标记为 async
+    it('should kill the ffplay process, update state, and emit "playback-paused" when playing', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const pausedSpy = vi.fn();
       playerService.on('playback-paused', pausedSpy);
@@ -216,18 +235,19 @@ describe('PlayerService Unit Tests', () => {
     });
 
     it('should do nothing if not playing', () => {
-        // 安排 (Arrange) - 默认状态下没有播放
-        
-        // 行动 (Act)
-        playerService.pause();
+      // 安排 (Arrange) - 默认状态下没有播放
 
-        // 断言 (Assert)
-        expect(mockProcess.kill).not.toHaveBeenCalled();
+      // 行动 (Act)
+      playerService.pause();
+
+      // 断言 (Assert)
+      expect(mockProcess.kill).not.toHaveBeenCalled();
     });
   });
 
   describe('resume()', () => {
-    it('should restart ffplay from paused time and emit "playback-resumed" if currently paused', async () => { // 标记为 async
+    it('should restart ffplay from paused time and emit "playback-resumed" if currently paused', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const resumedSpy = vi.fn();
       playerService.on('playback-resumed', resumedSpy);
@@ -237,7 +257,9 @@ describe('PlayerService Unit Tests', () => {
       mockProcess.triggerClose(null); // 模拟进程被杀死后触发 close 事件
 
       const secondMockProcess = createMockProcess(); // 准备第二个 mock 进程用于 resume
-      mockedSpawn.mockReturnValueOnce(secondMockProcess as unknown as ChildProcessWithoutNullStreams);
+      mockedSpawn.mockReturnValueOnce(
+        secondMockProcess as unknown as ChildProcessWithoutNullStreams
+      );
 
       // 行动 (Act)
       await playerService.resume(); // await resume
@@ -245,17 +267,23 @@ describe('PlayerService Unit Tests', () => {
       // 断言 (Assert)
       expect(mockedSpawn).toHaveBeenCalledTimes(2); // play 被调用了两次 (play 和 resume 内部的 play)
       expect(mockedSpawn).toHaveBeenCalledWith('ffplay', [
-        '-i', mockTrack.path, // 确保顺序正确
-        '-ss', '35', // 应该从暂停时间开始
-        '-nodisp', '-autoexit', '-stats',
-        '-af', 'volume=1.0'
+        '-i',
+        mockTrack.path, // 确保顺序正确
+        '-ss',
+        '35', // 应该从暂停时间开始
+        '-nodisp',
+        '-autoexit',
+        '-stats',
+        '-af',
+        'volume=1.0',
       ]);
       expect(playerService.getIsPaused()).toBe(false);
       expect(resumedSpy).toHaveBeenCalledWith({ currentTime: 35.0 });
       expect(playerService.getCurrentTrack()).toEqual(mockTrack); // 恢复后 currentTrack 应该仍然存在
     });
 
-    it('should log a message if no track to resume or not in paused state', async () => { // 标记为 async
+    it('should log a message if no track to resume or not in paused state', async () => {
+      // 标记为 async
       // 安排 (Arrange)
       const consoleSpy = vi.spyOn(console, 'log');
 
@@ -263,7 +291,9 @@ describe('PlayerService Unit Tests', () => {
       await playerService.resume(); // 默认状态下，没有播放也没有暂停
 
       // 断言 (Assert)
-      expect(consoleSpy).toHaveBeenCalledWith('No track to resume or not in paused state.');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'No track to resume or not in paused state.'
+      );
       expect(mockedSpawn).not.toHaveBeenCalled(); // 不应该启动新进程
     });
   });
@@ -280,10 +310,15 @@ describe('PlayerService Unit Tests', () => {
       playerService.play(mockTrack);
 
       // 行动 (Act)
-      mockProcess.triggerStderr('4.5 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r');
-      
+      mockProcess.triggerStderr(
+        '4.5 M-A:   0.000 fd=   0 aq=    0KB vq=    0KB sq=    0B f=0/0   \r'
+      );
+
       // 断言 (Assert)
-      expect(progressSpy).toHaveBeenCalledWith({ currentTime: 4.5, duration: mockTrack.duration });
+      expect(progressSpy).toHaveBeenCalledWith({
+        currentTime: 4.5,
+        duration: mockTrack.duration,
+      });
       expect(playerService.getPausedTime()).toBe(4.5);
     });
 
@@ -314,7 +349,9 @@ describe('PlayerService Unit Tests', () => {
       // 断言 (Assert)
       expect(errorSpy).toHaveBeenCalledTimes(1);
       expect(errorSpy).toHaveBeenCalledWith(expect.any(Error));
-      expect(errorSpy.mock.calls[0][0].message).toContain('ffplay exited with code 1');
+      expect(errorSpy.mock.calls[0][0].message).toContain(
+        'ffplay exited with code 1'
+      );
       expect(playerService.getCurrentTrack()).toBeNull();
     });
 
@@ -327,10 +364,12 @@ describe('PlayerService Unit Tests', () => {
 
       // 行动 (Act)
       mockProcess.triggerError(spawnError);
-      
+
       // 断言 (Assert)
       expect(errorSpy).toHaveBeenCalledWith(expect.any(Error));
-      expect(errorSpy.mock.calls[0][0].message).toContain(`Failed to start ffplay: ${spawnError.message}`);
+      expect(errorSpy.mock.calls[0][0].message).toContain(
+        `Failed to start ffplay: ${spawnError.message}`
+      );
     });
   });
 

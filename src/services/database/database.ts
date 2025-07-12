@@ -5,7 +5,9 @@ class MusicDatabase {
   private db: Database.Database;
 
   constructor(dbPath: string = 'music.db') {
-    this.db = new Database(dbPath, { verbose: process.env.NODE_ENV === 'development' ? console.log : undefined });
+    this.db = new Database(dbPath, {
+      verbose: process.env.NODE_ENV === 'development' ? console.log : undefined,
+    });
     this.init();
   }
 
@@ -23,12 +25,20 @@ class MusicDatabase {
   }
 
   insertTracks(tracks: Track[]) {
-    const insert = this.db.prepare('INSERT OR IGNORE INTO tracks (path, title, artist, album, duration) VALUES (?, ?, ?, ?, ?)');
+    const insert = this.db.prepare(
+      'INSERT OR IGNORE INTO tracks (path, title, artist, album, duration) VALUES (?, ?, ?, ?, ?)'
+    );
     const transaction = this.db.transaction((tracksToInsert: Track[]) => {
       for (const track of tracksToInsert) {
         // Standardize path before inserting
         const standardizedPath = track.path.replace(/\\/g, '/');
-        insert.run(standardizedPath, track.title, track.artist, track.album, track.duration);
+        insert.run(
+          standardizedPath,
+          track.title,
+          track.artist,
+          track.album,
+          track.duration
+        );
       }
     });
     transaction(tracks);
@@ -41,7 +51,9 @@ class MusicDatabase {
   getTrackByPath(path: string): Track | undefined {
     // Standardize path before querying
     const standardizedPath = path.replace(/\\/g, '/');
-    return this.db.prepare('SELECT * FROM tracks WHERE path = ?').get(standardizedPath) as Track | undefined;
+    return this.db
+      .prepare('SELECT * FROM tracks WHERE path = ?')
+      .get(standardizedPath) as Track | undefined;
   }
 
   close() {

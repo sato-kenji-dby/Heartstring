@@ -24,7 +24,7 @@ let fs: any;
 let mm: any;
 
 // 导入被测试的函数
-import { scanDirectory } from '../LibraryService'; 
+import { scanDirectory } from '../LibraryService';
 
 // --- Test Suite ---
 describe('scanDirectory Unit Tests', () => {
@@ -59,7 +59,6 @@ describe('scanDirectory Unit Tests', () => {
     },
     format: { duration: 180 },
   });
-
 
   // ===================================
   // ===      成功场景 (Success Scenarios)      ===
@@ -96,11 +95,15 @@ describe('scanDirectory Unit Tests', () => {
     const rootDir = '/library';
     const rockDir = path.join(rootDir, 'Rock');
     const popDir = path.join(rootDir, 'Pop');
-    
+
     // 安排 (Arrange)
     fs.readdir.mockImplementation(async (dirPath: string) => {
       if (dirPath === rootDir) {
-        return [createDirent('song1.mp3', 'file'), createDirent('Rock', 'dir'), createDirent('Pop', 'dir')];
+        return [
+          createDirent('song1.mp3', 'file'),
+          createDirent('Rock', 'dir'),
+          createDirent('Pop', 'dir'),
+        ];
       }
       if (dirPath === rockDir) {
         return [createDirent('song2.flac', 'file')];
@@ -160,7 +163,10 @@ describe('scanDirectory Unit Tests', () => {
 
   it('should return an empty array for a directory with only unsupported files', async () => {
     const fakeDir = '/no-music';
-    fs.readdir.mockResolvedValue([createDirent('image.png', 'file'), createDirent('document.pdf', 'file')]);
+    fs.readdir.mockResolvedValue([
+      createDirent('image.png', 'file'),
+      createDirent('document.pdf', 'file'),
+    ]);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -173,9 +179,9 @@ describe('scanDirectory Unit Tests', () => {
     const subDir = path.join(fakeDir, 'empty_subdir');
 
     fs.readdir.mockImplementation(async (dirPath: string) => {
-        if (dirPath === fakeDir) return [createDirent('empty_subdir', 'dir')];
-        if (dirPath === subDir) return []; // 子目录是空的
-        return [];
+      if (dirPath === fakeDir) return [createDirent('empty_subdir', 'dir')];
+      if (dirPath === subDir) return []; // 子目录是空的
+      return [];
     });
 
     const tracks = await scanDirectory(fakeDir);
@@ -197,7 +203,7 @@ describe('scanDirectory Unit Tests', () => {
     });
 
     mm.parseFile.mockResolvedValue(mockMetadata('Deep Song'));
-    
+
     const tracks = await scanDirectory(L1);
 
     expect(tracks).toHaveLength(1);
@@ -216,19 +222,22 @@ describe('scanDirectory Unit Tests', () => {
     const tracks = await scanDirectory(fakeDir);
 
     expect(tracks).toEqual([]);
-    expect(console.error).toHaveBeenCalledWith(`Error reading directory ${fakeDir}:`, error);
+    expect(console.error).toHaveBeenCalledWith(
+      `Error reading directory ${fakeDir}:`,
+      error
+    );
   });
 
   it('should skip a file and log error if metadata parsing fails', async () => {
     const fakeDir = '/corrupted';
     const badFile = path.join(fakeDir, 'bad.flac');
     const parseError = new Error('Corrupted metadata');
-    
+
     fs.readdir.mockResolvedValue([
-        createDirent('good.mp3', 'file'),
-        createDirent('bad.flac', 'file')
+      createDirent('good.mp3', 'file'),
+      createDirent('bad.flac', 'file'),
     ]);
-    
+
     mm.parseFile.mockImplementation(async (filePath: string) => {
       if (filePath === badFile) throw parseError;
       return mockMetadata('Good Song');
@@ -238,7 +247,10 @@ describe('scanDirectory Unit Tests', () => {
 
     expect(tracks).toHaveLength(1);
     expect(tracks[0].title).toBe('Good Song');
-    expect(console.error).toHaveBeenCalledWith(`Error reading metadata for ${badFile}:`, parseError);
+    expect(console.error).toHaveBeenCalledWith(
+      `Error reading metadata for ${badFile}:`,
+      parseError
+    );
   });
 
   it('should skip a subdirectory and log error if it cannot be read, but continue with others', async () => {
@@ -248,7 +260,12 @@ describe('scanDirectory Unit Tests', () => {
     const accessError = new Error('EACCES: permission denied');
 
     fs.readdir.mockImplementation(async (dirPath: string) => {
-      if (dirPath === rootDir) return [createDirent('root.mp3', 'file'), createDirent('good', 'dir'), createDirent('bad', 'dir')];
+      if (dirPath === rootDir)
+        return [
+          createDirent('root.mp3', 'file'),
+          createDirent('good', 'dir'),
+          createDirent('bad', 'dir'),
+        ];
       if (dirPath === goodDir) return [createDirent('good-song.wav', 'file')];
       if (dirPath === badDir) throw accessError; // 此目录读取失败
       return [];
@@ -260,6 +277,9 @@ describe('scanDirectory Unit Tests', () => {
 
     expect(tracks).toHaveLength(2); // root.mp3 和 good-song.wav
     expect(mm.parseFile).toHaveBeenCalledTimes(2);
-    expect(console.error).toHaveBeenCalledWith(`Error reading directory ${badDir}:`, accessError);
+    expect(console.error).toHaveBeenCalledWith(
+      `Error reading directory ${badDir}:`,
+      accessError
+    );
   });
 });

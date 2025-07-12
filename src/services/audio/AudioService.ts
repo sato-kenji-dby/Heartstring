@@ -4,7 +4,8 @@ import type { Track } from '$types';
 export class AudioService {
   private queue: Track[] = [];
   private playerService: PlayerService;
-  private sendToRenderer: ((channel: string, ...args: any[]) => void) | null = null; // 用于向渲染进程发送消息
+  private sendToRenderer: ((channel: string, ...args: any[]) => void) | null =
+    null; // 用于向渲染进程发送消息
 
   constructor(playerService: PlayerService) {
     this.playerService = playerService;
@@ -30,38 +31,53 @@ export class AudioService {
       }
     });
 
-    this.playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
-      // console.log(`[AudioService] Received playback-progress: currentTime=${currentTime}, duration=${duration}`); // 添加日志
-      if (this.sendToRenderer) {
-        this.sendToRenderer('player-store-update', {
-          progress: currentTime,
-          duration: duration > 0 ? duration : undefined,
-        });
-        this.sendToRenderer('playback-progress', { currentTime, duration }); // 也可以保留这个，用于更细粒度的监听
+    this.playerService.on(
+      'playback-progress',
+      ({
+        currentTime,
+        duration,
+      }: {
+        currentTime: number;
+        duration: number;
+      }) => {
+        // console.log(`[AudioService] Received playback-progress: currentTime=${currentTime}, duration=${duration}`); // 添加日志
+        if (this.sendToRenderer) {
+          this.sendToRenderer('player-store-update', {
+            progress: currentTime,
+            duration: duration > 0 ? duration : undefined,
+          });
+          this.sendToRenderer('playback-progress', { currentTime, duration }); // 也可以保留这个，用于更细粒度的监听
+        }
       }
-    });
+    );
 
-    this.playerService.on('playback-paused', ({ currentTime }: { currentTime: number }) => {
-      if (this.sendToRenderer) {
-        this.sendToRenderer('player-store-update', {
-          isPlaying: false,
-          status: 'paused',
-          progress: currentTime,
-        });
-        this.sendToRenderer('playback-paused', { currentTime });
+    this.playerService.on(
+      'playback-paused',
+      ({ currentTime }: { currentTime: number }) => {
+        if (this.sendToRenderer) {
+          this.sendToRenderer('player-store-update', {
+            isPlaying: false,
+            status: 'paused',
+            progress: currentTime,
+          });
+          this.sendToRenderer('playback-paused', { currentTime });
+        }
       }
-    });
+    );
 
-    this.playerService.on('playback-resumed', ({ currentTime }: { currentTime: number }) => {
-      if (this.sendToRenderer) {
-        this.sendToRenderer('player-store-update', {
-          isPlaying: true,
-          status: 'playing',
-          progress: currentTime,
-        });
-        this.sendToRenderer('playback-resumed', { currentTime });
+    this.playerService.on(
+      'playback-resumed',
+      ({ currentTime }: { currentTime: number }) => {
+        if (this.sendToRenderer) {
+          this.sendToRenderer('player-store-update', {
+            isPlaying: true,
+            status: 'playing',
+            progress: currentTime,
+          });
+          this.sendToRenderer('playback-resumed', { currentTime });
+        }
       }
-    });
+    );
 
     this.playerService.on('playback-ended', () => {
       if (this.sendToRenderer) {
@@ -113,14 +129,20 @@ export class AudioService {
     if (this.sendToRenderer) {
       this.sendToRenderer('player-store-update', { queue: [...this.queue] });
     }
-    console.log('Added to queue:', track.title, 'Current queue length:', this.queue.length);
+    console.log(
+      'Added to queue:',
+      track.title,
+      'Current queue length:',
+      this.queue.length
+    );
   }
 
   getQueue(): Track[] {
     return this.queue;
   }
 
-  async playNext() { // 将 playNext 方法改为 async
+  async playNext() {
+    // 将 playNext 方法改为 async
     if (this.queue.length > 0) {
       const nextTrack = this.queue.shift();
       if (nextTrack) {
@@ -136,7 +158,7 @@ export class AudioService {
     } else {
       console.log('Queue is empty. No next track to play.');
       // 如果队列为空，也确保停止播放并重置状态
-      await this.playerService.stop(); 
+      await this.playerService.stop();
       if (this.sendToRenderer) {
         this.sendToRenderer('player-store-update', {
           currentTrack: null,

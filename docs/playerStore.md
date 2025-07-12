@@ -30,28 +30,28 @@ export interface Track {
 
 ### 属性说明
 
-*   **`currentTrack: Track | null`**
-    *   **描述**: 当前正在播放的音轨对象。如果没有音轨正在播放，则为 `null`。
-    *   **类型**: `Track` 或 `null`。
-*   **`isPlaying: boolean`**
-    *   **描述**: 指示播放器是否处于播放状态（即音频正在输出）。
-    *   **类型**: `boolean`。
-*   **`progress: number`**
-    *   **描述**: 当前音轨的播放进度，单位为秒。
-    *   **类型**: `number`。
-*   **`duration: number`**
-    *   **描述**: 当前音轨的总时长，单位为秒。
-    *   **类型**: `number`。
-*   **`status: 'playing' | 'paused' | 'stopped' | 'error'`**
-    *   **描述**: 播放器的详细状态。
-        *   `'playing'`: 正在播放。
-        *   `'paused'`: 已暂停。
-        *   `'stopped'`: 已停止或未开始播放。
-        *   `'error'`: 播放过程中发生错误。
-    *   **类型**: 联合类型字符串。
-*   **`queue: Track[]`**
-    *   **描述**: 播放队列，包含即将播放的音轨列表。
-    *   **类型**: `Track[]`。
+- **`currentTrack: Track | null`**
+  - **描述**: 当前正在播放的音轨对象。如果没有音轨正在播放，则为 `null`。
+  - **类型**: `Track` 或 `null`。
+- **`isPlaying: boolean`**
+  - **描述**: 指示播放器是否处于播放状态（即音频正在输出）。
+  - **类型**: `boolean`。
+- **`progress: number`**
+  - **描述**: 当前音轨的播放进度，单位为秒。
+  - **类型**: `number`。
+- **`duration: number`**
+  - **描述**: 当前音轨的总时长，单位为秒。
+  - **类型**: `number`。
+- **`status: 'playing' | 'paused' | 'stopped' | 'error'`**
+  - **描述**: 播放器的详细状态。
+    - `'playing'`: 正在播放。
+    - `'paused'`: 已暂停。
+    - `'stopped'`: 已停止或未开始播放。
+    - `'error'`: 播放过程中发生错误。
+  - **类型**: 联合类型字符串。
+- **`queue: Track[]`**
+  - **描述**: 播放队列，包含即将播放的音轨列表。
+  - **类型**: `Track[]`。
 
 ## 使用方法
 
@@ -94,34 +94,34 @@ import { playerStore } from '$stores/playerStore';
 
 #### `play(track: Track): void`
 
-*   **描述**: 请求主进程播放指定的音轨。
-*   **参数**:
-    *   `track`: `Track` 类型，表示要播放的音轨对象。
-*   **IPC 事件**: 发送 `play-track` 事件到主进程。
+- **描述**: 请求主进程播放指定的音轨。
+- **参数**:
+  - `track`: `Track` 类型，表示要播放的音轨对象。
+- **IPC 事件**: 发送 `play-track` 事件到主进程。
 
 #### `pause(): void`
 
-*   **描述**: 请求主进程暂停当前播放。
-*   **IPC 事件**: 发送 `pause-playback` 事件到主进程。
+- **描述**: 请求主进程暂停当前播放。
+- **IPC 事件**: 发送 `pause-playback` 事件到主进程。
 
 #### `resume(): void`
 
-*   **描述**: 请求主进程恢复当前暂停的播放。
-*   **IPC 事件**: 发送 `resume-playback` 事件到主进程。
+- **描述**: 请求主进程恢复当前暂停的播放。
+- **IPC 事件**: 发送 `resume-playback` 事件到主进程。
 
 #### `stop(): void`
 
-*   **描述**: 请求主进程停止当前播放。
-*   **IPC 事件**: 发送 `stop-playback` 事件到主进程。
+- **描述**: 请求主进程停止当前播放。
+- **IPC 事件**: 发送 `stop-playback` 事件到主进程。
 
 #### `addToQueue(track: Track): void`
 
-*   **描述**: 请求主进程将指定的音轨添加到播放队列。
-*   **参数**:
-    *   `track`: `Track` 类型，表示要添加到队列的音轨对象。
-*   **IPC 事件**: 发送 `add-to-queue` 事件到主进程。
+- **描述**: 请求主进程将指定的音轨添加到播放队列。
+- **参数**:
+  - `track`: `Track` 类型，表示要添加到队列的音轨对象。
+- **IPC 事件**: 发送 `add-to-queue` 事件到主进程。
 
 #### `next(): void`
 
-*   **描述**: 请求主进程播放队列中的下一首歌曲。
-*   **IPC 事件**: 发送 `play-next-track` 事件到主进程。
+- **描述**: 请求主进程播放队列中的下一首歌曲。
+- **IPC 事件**: 发送 `play-next-track` 事件到主进程。

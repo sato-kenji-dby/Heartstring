@@ -9,7 +9,7 @@ import type { PlayerState, Track } from '$types';
 // 模拟 PlayerService 模块
 vi.mock('$core/player/PlayerService', () => {
   // 使用 require 确保 EventEmitter 同步加载，避免 ReferenceError
-  const { EventEmitter } = require('events'); 
+  const { EventEmitter } = require('events');
   class MockPlayerService extends EventEmitter {
     play = vi.fn((track: Track) => {
       // 模拟播放开始，触发事件
@@ -31,7 +31,7 @@ vi.mock('$core/player/PlayerService', () => {
 });
 
 // 声明 mockedPlayerService，以便在 describe 作用域内访问
-let mockedPlayerService: any; 
+let mockedPlayerService: any;
 
 describe('AudioService Unit Tests', () => {
   const mockTrack: Track = {
@@ -60,7 +60,7 @@ describe('AudioService Unit Tests', () => {
     vi.clearAllMocks(); // 确保在每次测试前清除所有 mocks
     vi.useFakeTimers();
     // playerStore.set(initialPlayerState); // 移除对 playerStore 的直接设置
-    
+
     // 在 beforeEach 内部声明并实例化 mockedPlayerService
     const { PlayerService } = await import('$core/player/PlayerService');
     const mockedPlayerServiceInstance = new PlayerService(); // 获取模拟实例
@@ -68,11 +68,11 @@ describe('AudioService Unit Tests', () => {
     audioServiceInstance = new AudioService(mockedPlayerServiceInstance); // 使用局部变量
 
     // 将 mockedPlayerService 赋值给一个在 describe 作用域内的变量，以便在 it 块中访问
-    mockedPlayerService = mockedPlayerServiceInstance; 
+    mockedPlayerService = mockedPlayerServiceInstance;
 
     mockSendToRenderer = vi.fn();
     audioServiceInstance.setMainWindowSender(mockSendToRenderer);
-    
+
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -96,13 +96,15 @@ describe('AudioService Unit Tests', () => {
     // 此时 mockSendToRenderer 已经被调用过一次，包含 mockTrack
 
     // 清除 mockSendToRenderer 的调用历史，以便只检查 stopPlayback 后的调用
-    mockSendToRenderer.mockClear(); 
+    mockSendToRenderer.mockClear();
 
     audioServiceInstance.stopPlayback();
     await vi.advanceTimersByTime(0); // 允许异步操作完成
     expect(mockedPlayerService.stop).toHaveBeenCalled();
     // 检查 sendToRenderer 是否发送了队列清空的消息
-    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', { queue: [] });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
+      queue: [],
+    });
   });
 
   it('should delegate pausePlayback to playerService.pause', () => {
@@ -119,7 +121,9 @@ describe('AudioService Unit Tests', () => {
     audioServiceInstance.addToQueue(mockTrack);
     await vi.advanceTimersByTime(0); // 允许异步操作完成
     // 检查 sendToRenderer 是否发送了队列更新的消息
-    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', { queue: [mockTrack] });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
+      queue: [mockTrack],
+    });
   });
 
   it('should return the current queue', async () => {
@@ -145,19 +149,28 @@ describe('AudioService Unit Tests', () => {
       progress: 0,
       duration: mockTrack.duration,
     });
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-started', mockTrack);
+    expect(mockSendToRenderer).toHaveBeenCalledWith(
+      'playback-started',
+      mockTrack
+    );
   });
 
   it('should send player-store-update and playback-progress on "playback-progress" event', async () => {
     mockedPlayerService.emit('playback-started', mockTrack); // Simulate start to set duration
     await vi.advanceTimersByTime(0);
-    mockedPlayerService.emit('playback-progress', { currentTime: 30, duration: 120 });
+    mockedPlayerService.emit('playback-progress', {
+      currentTime: 30,
+      duration: 120,
+    });
     await vi.advanceTimersByTime(0);
     expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
       progress: 30,
       duration: 120,
     });
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-progress', { currentTime: 30, duration: 120 });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-progress', {
+      currentTime: 30,
+      duration: 120,
+    });
   });
 
   it('should send player-store-update and playback-paused on "playback-paused" event', async () => {
@@ -170,7 +183,9 @@ describe('AudioService Unit Tests', () => {
       status: 'paused',
       progress: 60,
     });
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-paused', { currentTime: 60 });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-paused', {
+      currentTime: 60,
+    });
   });
 
   it('should send player-store-update and playback-resumed on "playback-resumed" event', async () => {
@@ -185,7 +200,9 @@ describe('AudioService Unit Tests', () => {
       status: 'playing',
       progress: 60,
     });
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-resumed', { currentTime: 60 });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-resumed', {
+      currentTime: 60,
+    });
   });
 
   it('should send player-store-update and playback-ended on "playback-ended" event and play next in queue', async () => {
@@ -209,7 +226,9 @@ describe('AudioService Unit Tests', () => {
     // 期望播放下一首
     expect(mockedPlayerService.play).toHaveBeenCalledWith(track2);
     // 期望队列更新消息
-    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', { queue: [] });
+    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
+      queue: [],
+    });
   });
 
   it('should send player-store-update and playback-error on "playback-error" event and play next in queue', async () => {
@@ -223,7 +242,10 @@ describe('AudioService Unit Tests', () => {
     await vi.advanceTimersByTime(0);
 
     // 期望发送 playback-error 消息
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-error', 'Playback failed');
+    expect(mockSendToRenderer).toHaveBeenCalledWith(
+      'playback-error',
+      'Playback failed'
+    );
     // 期望发送 player-store-update 消息，反映错误状态
     expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
       isPlaying: false,
@@ -232,8 +254,13 @@ describe('AudioService Unit Tests', () => {
     // 期望播放下一首
     expect(mockedPlayerService.play).toHaveBeenCalledWith(track2);
     // 期望队列更新消息
-    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', { queue: [] });
-    expect(console.error).toHaveBeenCalledWith('AudioService received playback error:', expect.any(Error));
+    expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
+      queue: [],
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      'AudioService received playback error:',
+      expect.any(Error)
+    );
   });
 
   // ===================================
@@ -246,7 +273,9 @@ describe('AudioService Unit Tests', () => {
     mockedPlayerService.emit('playback-ended');
     await vi.advanceTimersByTime(0);
 
-    expect(mockedPlayerService.play).not.toHaveBeenCalledWith(expect.anything());
+    expect(mockedPlayerService.play).not.toHaveBeenCalledWith(
+      expect.anything()
+    );
     // 期望发送 playback-ended 消息
     expect(mockSendToRenderer).toHaveBeenCalledWith('playback-ended');
     // 期望发送 player-store-update 消息，反映播放结束且队列为空的状态
@@ -263,13 +292,16 @@ describe('AudioService Unit Tests', () => {
     await vi.advanceTimersByTime(0);
     mockedPlayerService.emit('playback-error', new Error('Playback failed'));
     await vi.advanceTimersByTime(0);
-    
+
     // 期望发送 player-store-update 消息，反映错误状态
     expect(mockSendToRenderer).toHaveBeenCalledWith('player-store-update', {
       isPlaying: false,
       status: 'error',
     });
-    expect(mockSendToRenderer).toHaveBeenCalledWith('playback-error', 'Playback failed');
+    expect(mockSendToRenderer).toHaveBeenCalledWith(
+      'playback-error',
+      'Playback failed'
+    );
 
     // 再次触发 playback-ended，但队列为空
     mockedPlayerService.emit('playback-ended');
@@ -285,6 +317,8 @@ describe('AudioService Unit Tests', () => {
       progress: 0,
     });
     // 确认没有尝试播放下一首
-    expect(mockedPlayerService.play).not.toHaveBeenCalledWith(expect.anything());
+    expect(mockedPlayerService.play).not.toHaveBeenCalledWith(
+      expect.anything()
+    );
   });
 });

@@ -20,7 +20,9 @@ export async function scanDirectory(dir: string): Promise<Track[]> {
       console.log(`Scanning: ${filePath}`); // 添加日志
       if (file.isDirectory()) {
         tracks = tracks.concat(await scanDirectory(filePath));
-      } else if (SUPPORTED_EXTENSIONS.has(path.extname(file.name).toLowerCase())) {
+      } else if (
+        SUPPORTED_EXTENSIONS.has(path.extname(file.name).toLowerCase())
+      ) {
         try {
           const metadata = await musicMetadata.parseFile(filePath);
           tracks.push({

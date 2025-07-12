@@ -31,6 +31,6 @@ module.exports = {
   rules: {
     // 你可以在这里添加或覆盖自定义规则
     // 例如，如果你想允许使用console.log而不报错
-    'no-console': 'off', 
+    'no-console': 'off',
   },
 };

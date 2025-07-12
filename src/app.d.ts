@@ -30,10 +30,22 @@ declare global {
     send(channel: 'add-to-queue', track: Track): void;
     send(channel: 'play-next-track'): void; // 添加新的 send 方法重载
 
-    on(channel: 'player-store-update', listener: (event: Electron.IpcRendererEvent, newState: Partial<PlayerState>) => void): Electron.IpcRenderer;
-    on(channel: string, listener: (...args: any[]) => void): Electron.IpcRenderer; // 通用 on 方法
+    on(
+      channel: 'player-store-update',
+      listener: (
+        event: Electron.IpcRendererEvent,
+        newState: Partial<PlayerState>
+      ) => void
+    ): Electron.IpcRenderer;
+    on(
+      channel: string,
+      listener: (...args: any[]) => void
+    ): Electron.IpcRenderer; // 通用 on 方法
 
-    off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
+    off: (
+      channel: string,
+      listener: (...args: any[]) => void
+    ) => Electron.IpcRenderer;
     invoke: (channel: string, ...args: any[]) => Promise<any>;
   }
 
@@ -42,13 +54,13 @@ declare global {
     ipcRenderer: IpcRendererAPI; // 添加 ipcRenderer
   }
 
-	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
+  namespace App {
+    // interface Error {}
+    // interface Locals {}
+    // interface PageData {}
+    // interface PageState {}
+    // interface Platform {}
+  }
 }
 
 export {};

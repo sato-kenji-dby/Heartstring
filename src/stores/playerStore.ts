@@ -13,9 +13,12 @@ const createPlayerStore = () => {
   });
 
   // 监听来自主进程的统一状态更新
-  ipcRenderer.on('player-store-update', (event, newState: Partial<PlayerState>) => {
-    update(state => ({ ...state, ...newState }));
-  });
+  ipcRenderer.on(
+    'player-store-update',
+    (event, newState) => {
+      update((state) => ({ ...state, ...(newState as Partial<PlayerState>) }));
+    }
+  );
 
   // 返回公共接口
   return {
@@ -37,7 +40,7 @@ const createPlayerStore = () => {
     },
     next: () => {
       ipcRenderer.send('play-next-track');
-    }
+    },
   };
 };
 

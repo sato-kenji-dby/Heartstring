@@ -5,9 +5,9 @@ name: Heartstring CI/CD
 # 触发工作流的事件
 on:
   push: # 当有代码推送到...
-    branches: [ "master" ] # 更改为 main 分支
+    branches: ['master'] # 更改为 main 分支
   pull_request: # 或者当有PR提交到...
-    branches: [ "master" ] # 更改为 main 分支
+    branches: ['master'] # 更改为 main 分支
 
 # 定义工作流要执行的任务
 jobs:
@@ -45,12 +45,12 @@ jobs:
     name: Build Application
     # 'needs'关键字确保这个任务会在'test-and-lint'成功后才开始
     needs: test-and-lint # 依赖 test-and-lint
-    
+
     # 'strategy.matrix'是CI/CD的精髓：并行运行多个配置
     strategy:
       matrix:
         # 我们要为这三个平台构建应用
-        os: [ubuntu-latest, macos-latest, windows-latest] 
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     # 指定运行的虚拟机环境，会根据上面的matrix变化
     runs-on: ${{ matrix.os }}
@@ -123,7 +123,7 @@ jobs:
           name: Release v${{ steps.get_version.outputs.version }}
           body: |
             Automated release for version ${{ steps.get_version.outputs.version }}.
-            
+
             This release includes:
             - New unit tests for library service
             - Updated CI/CD workflow

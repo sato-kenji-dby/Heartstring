@@ -9,10 +9,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 contextBridge.exposeInMainWorld('ipcRenderer', {
-  send: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
-  on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => ipcRenderer.on(channel, listener),
-  off: (channel: string, listener: (...args: any[]) => void) => ipcRenderer.off(channel, listener),
-  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  send: (channel: string, ...args: unknown[]) => ipcRenderer.send(channel, ...args),
+  on: (
+    channel: string,
+    listener: (event: Electron.IpcRendererEvent, ...args: unknown[]) => void
+  ) => ipcRenderer.on(channel, listener),
+  off: (channel: string, listener: (...args: unknown[]) => void) =>
+    ipcRenderer.off(channel, listener),
+  invoke: (channel: string, ...args: unknown[]) =>
+    ipcRenderer.invoke(channel, ...args),
 });
 
 console.log('[Preload] "electronAPI" and "ipcRenderer" exposed.');

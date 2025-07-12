@@ -27,33 +27,50 @@
   }
 </script>
 
-<div class="player-controls flex flex-col items-center p-4 border-t border-slate-700 bg-slate-800 w-full box-border">
+<div
+  class="player-controls box-border flex w-full flex-col items-center border-t border-slate-700 bg-slate-800 p-4"
+>
   {#if playerState.currentTrack}
-    <div class="track-info mb-4 font-bold text-lg">
-      <span>{playerState.currentTrack.title}</span> - <span>{playerState.currentTrack.artist}</span>
+    <div class="track-info mb-4 text-lg font-bold">
+      <span>{playerState.currentTrack.title}</span> -
+      <span>{playerState.currentTrack.artist}</span>
     </div>
   {:else}
-    <div class="track-info mb-4 font-bold text-lg">
+    <div class="track-info mb-4 text-lg font-bold">
       <span>没有正在播放的歌曲</span>
     </div>
   {/if}
 
-  <div class="playback-bar flex items-center w-4/5">
-    <button on:click={togglePlayPause} class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center mr-4">
+  <div class="playback-bar flex w-4/5 items-center">
+    <button
+      on:click={togglePlayPause}
+      class="mr-4 flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
+    >
       {#if playerState.isPlaying}
         <Pause size={20} />
       {:else}
         <Play size={20} />
       {/if}
     </button>
-    <button on:click={playNextTrack} class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center mr-4">
+    <button
+      on:click={playNextTrack}
+      class="mr-4 flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-blue-700"
+    >
       <SkipForward size={20} />
     </button>
-    <span class="time-display mr-4 text-sm min-w-[80px] text-right">{formatTime(playerState.progress)} / {formatTime(playerState.duration)}</span>
-    <progress value={playerState.progress} max={playerState.duration} class="flex-grow h-2 rounded-full bg-slate-700 [&::-webkit-progress-bar]:bg-slate-700 [&::-webkit-progress-value]:bg-blue-600"></progress>
+    <span class="time-display mr-4 min-w-[80px] text-right text-sm"
+      >{formatTime(playerState.progress)} / {formatTime(
+        playerState.duration
+      )}</span
+    >
+    <progress
+      value={playerState.progress}
+      max={playerState.duration}
+      class="h-2 flex-grow rounded-full bg-slate-700 [&::-webkit-progress-bar]:bg-slate-700 [&::-webkit-progress-value]:bg-blue-600"
+    ></progress>
   </div>
 
   {#if playerState.status === 'error'}
-    <div class="error-message text-red-500 mt-4">播放错误！</div>
+    <div class="error-message mt-4 text-red-500">播放错误！</div>
   {/if}
 </div>
