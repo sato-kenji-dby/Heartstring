@@ -25,13 +25,13 @@ const mockTrack: Track = {
  */
 type ControllableMockProcess = {
   stdin: {
-    write: vi.Mock<any[], any>;
+    write: vi.Mock<unknown[], unknown>;
   };
   stderr: {
-    on: vi.Mock<any[], any>;
+    on: vi.Mock<unknown[], unknown>;
   };
-  on: vi.Mock<any[], any>;
-  kill: vi.Mock<any[], any>;
+  on: vi.Mock<unknown[], unknown>;
+  kill: vi.Mock<unknown[], unknown>;
 
   // 用于在测试中触发事件的自定义方法
   triggerStderr: (data: string) => void;
@@ -44,7 +44,7 @@ type ControllableMockProcess = {
  * @returns {ControllableMockProcess} 一个符合我们定义的、类型安全的对象。
  */
 const createMockProcess = (): ControllableMockProcess => {
-  const eventListeners = new Map<string, (...args: any[]) => void>();
+  const eventListeners = new Map<string, (...args: unknown[]) => void>();
   const stderrListeners = new Map<string, (chunk: Buffer) => void>();
 
   return {
@@ -54,7 +54,7 @@ const createMockProcess = (): ControllableMockProcess => {
         stderrListeners.set(event, listener);
       }),
     },
-    on: vi.fn((event: string, listener: (...args: any[]) => void) => {
+    on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
       eventListeners.set(event, listener);
     }),
     kill: vi.fn(),

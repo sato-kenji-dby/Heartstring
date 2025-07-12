@@ -3,10 +3,14 @@ import * as path from 'path';
 import * as fs from 'fs'; // Use namespace import for better compatibility
 import type { Track } from '$types';
 
+import MusicDatabase from '$services/database/database';
+import { PlayerService } from '$core/player/PlayerService';
+import { AudioService } from '$services/audio/AudioService';
+
 // 全局变量，用于存储服务实例
-let db: any;
-let playerService: any;
-let audioService: any;
+let db: MusicDatabase;
+let playerService: PlayerService;
+let audioService: AudioService;
 let scanDirectory: (dir: string) => Promise<Track[]>;
 
 /**

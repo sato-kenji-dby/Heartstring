@@ -47,7 +47,7 @@ class PlayerService {
     ...args: Parameters<PlayerServiceEvents[K]>
   ): void {
     this.listeners[eventName]?.forEach((listener) => {
-      // @ts-ignore
+      // @ts-expect-error - TypeScript can't infer the correct type here
       listener(...args);
     });
   }

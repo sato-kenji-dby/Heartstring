@@ -4,8 +4,9 @@ import type { Track } from '$types';
 export class AudioService {
   private queue: Track[] = [];
   private playerService: PlayerService;
-  private sendToRenderer: ((channel: string, ...args: any[]) => void) | null =
-    null; // 用于向渲染进程发送消息
+  private sendToRenderer:
+    | ((channel: string, ...args: unknown[]) => void)
+    | null = null; // 用于向渲染进程发送消息
 
   constructor(playerService: PlayerService) {
     this.playerService = playerService;
@@ -13,7 +14,7 @@ export class AudioService {
   }
 
   // 设置用于向渲染进程发送消息的函数
-  setMainWindowSender(sender: (channel: string, ...args: any[]) => void) {
+  setMainWindowSender(sender: (channel: string, ...args: unknown[]) => void) {
     this.sendToRenderer = sender;
   }
 

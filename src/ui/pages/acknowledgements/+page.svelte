@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-
   interface LicenseInfo {
     licenses: string;
     repository: string;

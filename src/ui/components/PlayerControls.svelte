@@ -1,6 +1,5 @@
 <script lang="ts">
   import { playerStore } from '$stores/playerStore';
-  import type { Track } from '$types'; // 导入 Track 类型
   import { Play, Pause, SkipForward } from 'lucide-svelte';
 
   // 导入 window.audio 类型声明，虽然这里不需要显式导入，但为了清晰性可以保留

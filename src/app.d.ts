@@ -16,10 +16,17 @@ declare global {
     currentTime: number;
   }
 
+  interface License {
+    name: string;
+    version: string;
+    licenses: string;
+    repository?: string;
+  }
+
   interface ElectronAPI {
     openDirectoryDialog: () => Promise<string | null>;
     getAllTracks: () => Promise<Track[]>;
-    getLicenses: () => Promise<any>; // Added for acknowledgements page
+    getLicenses: () => Promise<License[]>; // Added for acknowledgements page
   }
 
   interface IpcRendererAPI {
@@ -39,14 +46,14 @@ declare global {
     ): Electron.IpcRenderer;
     on(
       channel: string,
-      listener: (...args: any[]) => void
+      listener: (...args: unknown[]) => void
     ): Electron.IpcRenderer; // 通用 on 方法
 
     off: (
       channel: string,
-      listener: (...args: any[]) => void
+      listener: (...args: unknown[]) => void
     ) => Electron.IpcRenderer;
-    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
   }
 
   interface Window {

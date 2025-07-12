@@ -16,10 +16,12 @@ interface IpcRendererAPI {
 }
 
 // 检查 window.ipcRenderer 是否存在，以避免 SSR 错误
-const isElectron = typeof window !== 'undefined' && (window as any).ipcRenderer; 
+const isElectron =
+  typeof window !== 'undefined' &&
+  (window as { ipcRenderer: IpcRendererAPI }).ipcRenderer;
 
 export const ipcRenderer: IpcRendererAPI = isElectron
-  ? (window as any).ipcRenderer
+  ? (window as unknown as { ipcRenderer: IpcRendererAPI }).ipcRenderer
   : {
       send: () => {},
       on: () => {
@@ -28,5 +30,5 @@ export const ipcRenderer: IpcRendererAPI = isElectron
       off: () => {
         return {} as Electron.IpcRenderer;
       },
-      invoke: async () => Promise.resolve(), // 模拟 invoke，返回 Promise
+      invoke: async <T>(): Promise<T> => Promise.resolve({} as T), // 模拟 invoke，返回 Promise
     };
