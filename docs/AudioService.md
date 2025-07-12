@@ -52,9 +52,9 @@ constructor(playerService: PlayerService)
 
 返回当前播放队列中的所有曲目。
 
-### `playNext()`
+### `playNext(): Promise<void>`
 
-尝试播放队列中的下一首歌曲。如果队列为空，播放将停止，并通过 `player-store-update` 消息通知渲染进程状态变化。在播放错误发生后，此方法也会被调用以尝试播放下一首。
+尝试播放队列中的下一首歌曲。此方法是异步的，在播放下一首之前，它会确保当前播放已完全停止。如果队列为空，播放将停止，并通过 `player-store-update` 消息通知渲染进程状态变化。在播放错误发生后，此方法也会被调用以尝试播放下一首。此方法也可以通过渲染进程的 `playerStore.next()` 触发 IPC 事件 `play-next-track` 来手动调用。
 
 ## 事件监听
 

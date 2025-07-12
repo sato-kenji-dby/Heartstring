@@ -80,4 +80,5 @@ function registerIpcHandlers(mainWindow: BrowserWindow) {
     ipcMain.on('pause-playback', () => audioService.pausePlayback());
     ipcMain.on('resume-playback', () => audioService.resumePlayback());
     ipcMain.on('add-to-queue', (_, track) => audioService.addToQueue(track));
+    ipcMain.on('play-next-track', () => audioService.playNext()); // 添加新的 IPC 处理器
 }

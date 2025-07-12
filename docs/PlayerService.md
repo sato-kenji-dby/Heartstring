@@ -8,25 +8,27 @@
 
 ### 1. 播放控制
 
-#### `play(track: Track, startTime: number = 0): void`
+#### `play(track: Track, startTime: number = 0): Promise<void>`
 
-*   **描述**: 开始播放指定的音轨。如果当前有音轨正在播放，它会先停止当前播放，然后开始新的播放。
+*   **描述**: 开始播放指定的音轨。如果当前有音轨正在播放，它会先异步停止当前播放，确保旧进程完全终止后，再开始新的播放。
 *   **参数**:
     *   `track`: `Track` 类型，表示要播放的音轨对象，包含 `id`, `path`, `title`, `artist`, `album`, `duration` 等信息。
     *   `startTime`: `number` (可选，默认为 `0`)，表示从音轨的哪个时间点开始播放（单位：秒）。
 *   **行为**:
+    *   **异步等待**: 如果 `ffplay` 进程存在，会 `await` `stop()` 方法的完成，确保旧进程完全终止并清理状态。
     *   启动一个 `ffplay` 子进程来播放音频。
     *   设置 `currentTrack` 为当前播放的音轨。
     *   重置 `isPaused` 为 `false`。
     *   设置 `pausedTime` 为 `startTime`。
     *   发射 `playback-started` 事件。
 
-#### `stop(): void`
+#### `stop(): Promise<void>`
 
-*   **描述**: 停止当前正在播放的音轨，并重置播放器状态。
+*   **描述**: 异步停止当前正在播放的音轨，并重置播放器状态。该方法返回一个 `Promise`，在 `ffplay` 进程实际关闭后解析。
 *   **行为**:
     *   如果 `ffplay` 进程存在，强制终止它 (`SIGKILL`)。
-    *   重置 `ffplayProcess`, `currentTrack`, `pausedTime`, `isPaused` 为初始状态。
+    *   监听 `ffplay` 进程的 `'close'` 事件，当进程真正关闭时，清理 `ffplayProcess`, `currentTrack`, `pausedTime`, `isPaused`, `isPlayingOrStarting` 等状态，并解析 `Promise`。
+    *   如果 `ffplay` 进程不存在，则立即解析 `Promise`。
 
 #### `pause(): void`
 

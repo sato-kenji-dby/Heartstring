@@ -19,6 +19,10 @@
       playerStore.resume();
     }
   }
+
+  function playNextTrack() {
+    playerStore.next();
+  }
 </script>
 
 <div class="player-controls">
@@ -40,6 +44,7 @@
         播放
       {/if}
     </button>
+    <button on:click={playNextTrack}>下一首</button>
     <span class="time-display">{formatTime(playerState.progress)} / {formatTime(playerState.duration)}</span>
     <progress value={playerState.progress} max={playerState.duration}></progress>
   </div>

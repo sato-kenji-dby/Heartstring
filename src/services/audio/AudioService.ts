@@ -31,7 +31,7 @@ export class AudioService {
     });
 
     this.playerService.on('playback-progress', ({ currentTime, duration }: { currentTime: number, duration: number }) => {
-      console.log(`[AudioService] Received playback-progress: currentTime=${currentTime}, duration=${duration}`); // 添加日志
+      // console.log(`[AudioService] Received playback-progress: currentTime=${currentTime}, duration=${duration}`); // 添加日志
       if (this.sendToRenderer) {
         this.sendToRenderer('player-store-update', {
           progress: currentTime,
@@ -120,10 +120,14 @@ export class AudioService {
     return this.queue;
   }
 
-  playNext() {
+  async playNext() { // 将 playNext 方法改为 async
     if (this.queue.length > 0) {
       const nextTrack = this.queue.shift();
       if (nextTrack) {
+        // 在播放下一首之前，确保当前播放已完全停止
+        console.log('Stopping current playback before playing next track...');
+        await this.playerService.stop(); // 等待 stop 操作完成
+
         this.playTrack(nextTrack);
         if (this.sendToRenderer) {
           this.sendToRenderer('player-store-update', { queue: this.queue });
@@ -131,6 +135,8 @@ export class AudioService {
       }
     } else {
       console.log('Queue is empty. No next track to play.');
+      // 如果队列为空，也确保停止播放并重置状态
+      await this.playerService.stop(); 
       if (this.sendToRenderer) {
         this.sendToRenderer('player-store-update', {
           currentTrack: null,

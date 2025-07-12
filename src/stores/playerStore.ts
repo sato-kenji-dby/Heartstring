@@ -34,6 +34,9 @@ const createPlayerStore = () => {
     },
     addToQueue: (track: Track) => {
       ipcRenderer.send('add-to-queue', track);
+    },
+    next: () => {
+      ipcRenderer.send('play-next-track');
     }
   };
 };

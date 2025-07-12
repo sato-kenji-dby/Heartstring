@@ -22,8 +22,16 @@ declare global {
   }
 
   interface IpcRendererAPI {
-    send: (channel: string, ...args: any[]) => void;
-    on: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
+    send(channel: 'play-track', track: Track): void;
+    send(channel: 'stop-playback'): void;
+    send(channel: 'pause-playback'): void;
+    send(channel: 'resume-playback'): void;
+    send(channel: 'add-to-queue', track: Track): void;
+    send(channel: 'play-next-track'): void; // 添加新的 send 方法重载
+
+    on(channel: 'player-store-update', listener: (event: Electron.IpcRendererEvent, newState: Partial<PlayerState>) => void): Electron.IpcRenderer;
+    on(channel: string, listener: (...args: any[]) => void): Electron.IpcRenderer; // 通用 on 方法
+
     off: (channel: string, listener: (...args: any[]) => void) => Electron.IpcRenderer;
     invoke: (channel: string, ...args: any[]) => Promise<any>;
   }

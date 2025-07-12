@@ -52,11 +52,11 @@ Heartstring 采用多进程模型，以实现健壮性和安全性：
 Heartstring 的播放功能涉及主进程和渲染进程之间的复杂交互，通过 IPC (Inter-Process Communication) 进行管理：
 
 *   **主进程 (`PlayerService` 和 `AudioService`):**
-    *   `PlayerService` 负责核心音频播放逻辑（如 `ffplay` 进程管理、暂停/恢复、进度解析）。
-    *   `AudioService` 封装了 `PlayerService`，并负责监听 `PlayerService` 的事件（如 `playback-progress`, `playback-ended` 等），然后通过 `ipcMain.emit` 将这些事件转发到渲染进程。
+    *   `PlayerService` 负责核心音频播放逻辑（如 `ffplay` 进程管理、暂停/恢复、进度解析）。**为了解决“下一首”功能中可能存在的竞态条件和多进程问题，`PlayerService.stop()` 方法现在返回一个 `Promise`，确保 `ffplay` 进程完全终止后才解析。`PlayerService.play()` 方法在启动新进程前会 `await` `stop()` 的完成。**
+    *   `AudioService` 封装了 `PlayerService`，并负责监听 `PlayerService` 的事件（如 `playback-progress`, `playback-ended` 等），然后通过 `ipcMain.emit` 将这些事件转发到渲染进程。**`AudioService.playNext()` 方法现在是异步的，并在播放下一首曲目之前显式地 `await playerService.stop()`，进一步确保在切换曲目时旧进程已完全清理。**
 *   **渲染进程 (`playerStore`):**
     *   `playerStore` 是一个自定义 Svelte 存储，它封装了与主进程的 IPC 通信。
-    *   它通过 `ipcRenderer.send` 向主进程发送播放控制命令（如 `play-track`, `pause-playback`, `resume-playback`, `stop-playback`, `add-to-queue`）。
+    *   它通过 `ipcRenderer.send` 向主进程发送播放控制命令（如 `play-track`, `pause-playback`, `resume-playback`, `stop-playback`, `add-to-queue`, `play-next-track`）。
     *   它通过 `ipcRenderer.on('player-store-update', ...)` 监听来自主进程的统一状态更新，并据此更新自身的播放状态。
 
 这种分离确保了 UI 的响应性，同时将敏感的系统操作隔离在主进程中。

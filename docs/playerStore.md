@@ -120,3 +120,8 @@ import { playerStore } from '$stores/playerStore';
 *   **参数**:
     *   `track`: `Track` 类型，表示要添加到队列的音轨对象。
 *   **IPC 事件**: 发送 `add-to-queue` 事件到主进程。
+
+#### `next(): void`
+
+*   **描述**: 请求主进程播放队列中的下一首歌曲。
+*   **IPC 事件**: 发送 `play-next-track` 事件到主进程。
