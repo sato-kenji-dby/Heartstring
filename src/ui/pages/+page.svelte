@@ -15,7 +15,6 @@
     tracks = await window.electronAPI.getAllTracks();
   }
 
-
   async function playTrack(track: Track) {
     // 库中点播时清空队列
     playerStore.playSingleTrack(track);

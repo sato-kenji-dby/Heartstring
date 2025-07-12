@@ -109,7 +109,9 @@ function registerIpcHandlers(mainWindow: BrowserWindow) {
   // 播放控制相关 (将事件代理到audioService)
   ipcMain.on('play-track', (_, track) => audioService.playTrack(track));
   // 新增：库中点播时清空队列并播放
-  ipcMain.on('play-single-track', (_, track) => audioService.playSingleTrack(track));
+  ipcMain.on('play-single-track', (_, track) =>
+    audioService.playSingleTrack(track)
+  );
   ipcMain.on('stop-playback', () => audioService.stopPlayback());
   ipcMain.on('pause-playback', () => audioService.pausePlayback());
   ipcMain.on('resume-playback', () => audioService.resumePlayback());
