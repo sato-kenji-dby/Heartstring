@@ -1,6 +1,8 @@
 <script lang="ts">
   import { playerStore } from '$stores/playerStore';
   import type { Track } from '$types'; // 导入 Track 类型
+  import { Play, Pause, SkipForward } from 'lucide-svelte';
+
   // 导入 window.audio 类型声明，虽然这里不需要显式导入，但为了清晰性可以保留
 
   // Subscribe to the playerStore
@@ -25,90 +27,33 @@
   }
 </script>
 
-<div class="player-controls">
+<div class="player-controls flex flex-col items-center p-4 border-t border-slate-700 bg-slate-800 w-full box-border">
   {#if playerState.currentTrack}
-    <div class="track-info">
+    <div class="track-info mb-4 font-bold text-lg">
       <span>{playerState.currentTrack.title}</span> - <span>{playerState.currentTrack.artist}</span>
     </div>
   {:else}
-    <div class="track-info">
+    <div class="track-info mb-4 font-bold text-lg">
       <span>没有正在播放的歌曲</span>
     </div>
   {/if}
 
-  <div class="playback-bar">
-    <button on:click={togglePlayPause}>
+  <div class="playback-bar flex items-center w-4/5">
+    <button on:click={togglePlayPause} class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center mr-4">
       {#if playerState.isPlaying}
-        暂停
+        <Pause size={20} />
       {:else}
-        播放
+        <Play size={20} />
       {/if}
     </button>
-    <button on:click={playNextTrack}>下一首</button>
-    <span class="time-display">{formatTime(playerState.progress)} / {formatTime(playerState.duration)}</span>
-    <progress value={playerState.progress} max={playerState.duration}></progress>
+    <button on:click={playNextTrack} class="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center mr-4">
+      <SkipForward size={20} />
+    </button>
+    <span class="time-display mr-4 text-sm min-w-[80px] text-right">{formatTime(playerState.progress)} / {formatTime(playerState.duration)}</span>
+    <progress value={playerState.progress} max={playerState.duration} class="flex-grow h-2 rounded-full bg-slate-700 [&::-webkit-progress-bar]:bg-slate-700 [&::-webkit-progress-value]:bg-blue-600"></progress>
   </div>
 
   {#if playerState.status === 'error'}
-    <div class="error-message">播放错误！</div>
+    <div class="error-message text-red-500 mt-4">播放错误！</div>
   {/if}
 </div>
-
-<style>
-  .player-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px;
-    border-top: 1px solid #eee;
-    background-color: #f9f9f9;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .track-info {
-    margin-bottom: 10px;
-    font-weight: bold;
-  }
-
-  .playback-bar {
-    display: flex;
-    align-items: center;
-    width: 80%;
-  }
-
-  .playback-bar button {
-    margin-right: 10px;
-    padding: 5px 10px;
-    cursor: pointer;
-  }
-
-  .time-display {
-    margin-right: 10px;
-    font-size: 0.9em;
-    min-width: 80px; /* Prevent jumping when time changes */
-    text-align: right;
-  }
-
-  .playback-bar progress {
-    flex-grow: 1;
-    height: 8px;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-
-  .playback-bar progress::-webkit-progress-bar {
-    background-color: #e0e0e0;
-    border-radius: 5px;
-  }
-
-  .playback-bar progress::-webkit-progress-value {
-    background-color: #007bff;
-    border-radius: 5px;
-  }
-
-  .error-message {
-    color: red;
-    margin-top: 10px;
-  }
-</style>
