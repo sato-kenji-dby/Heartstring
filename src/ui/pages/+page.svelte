@@ -3,6 +3,7 @@
   import { playerStore } from '$stores/playerStore'; // 导入 playerStore
   import type { Track } from '$types'; // 导入 Track 类型
   import PlayerControls from '../components/PlayerControls.svelte'; // 导入 PlayerControls 组件
+  import { Play, Plus } from 'lucide-svelte'; // 导入 Lucide 图标
 
   let tracks: Track[] = []; // 音乐库列表
 
@@ -55,7 +56,7 @@
   </button>
 
   <div class="flex flex-1 overflow-hidden">
-    <div class="flex flex-col w-1/2 pr-2">
+    <div class="flex flex-col w-1/3 pr-2">
       <h2 class="text-2xl font-semibold mt-4 mb-2 text-blue-300">播放队列</h2>
       {#if queue.length > 0}
         <div class="flex-1 overflow-y-auto">
@@ -69,11 +70,11 @@
             </thead>
             <tbody>
               {#each queue as track (track.id)}
-                <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
-                  <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
-                  <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
-                  <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
-                </tr>
+          <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.title || '未知标题'}</td>
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.artist || '未知艺术家'}</td>
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.album || '未知专辑'}</td>
+          </tr>
               {/each}
             </tbody>
           </table>
@@ -83,7 +84,7 @@
       {/if}
     </div>
 
-    <div class="flex flex-col w-1/2 pl-2">
+    <div class="flex flex-col w-2/3 pl-2">
       <h2 class="text-2xl font-semibold mt-4 mb-2 text-blue-300">音乐库</h2>
       {#if tracks.length > 0}
         <div class="flex-1 overflow-y-auto">
@@ -94,20 +95,24 @@
                 <th class="py-3 px-6 text-left">Artist</th>
                 <th class="py-3 px-6 text-left">Album</th>
                 <th class="py-3 px-6 text-left">Duration</th>
-                <th class="py-3 px-6 text-left">操作</th>
+                <th class="py-3 px-6 text-left">Operation</th>
               </tr>
             </thead>
             <tbody>
               {#each tracks as track (track.id)}
-                <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
-                  <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
-                  <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
-                  <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
-                  <td class="py-3 px-6 text-left">{track.duration ? track.duration.toFixed(2) + 's' : 'N/A'}</td>
+          <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.title || '未知标题'}</td>
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.artist || '未知艺术家'}</td>
+            <td class="py-3 px-6 text-left truncate max-w-xs">{track.album || '未知专辑'}</td>
+            <td class="py-3 px-6 text-left">{track.duration ? track.duration.toFixed(2) + 's' : 'N/A'}</td>
             <td class="py-3 px-6 text-left">
               <div class="flex items-center space-x-2">
-                <button on:click={() => playTrack(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200">播放</button>
-                <button on:click={() => addToQueue(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200">添加到队列</button>
+                <button on:click={() => playTrack(track)} class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center justify-center">
+                  <Play size="16" />
+                </button>
+                <button on:click={() => addToQueue(track)} class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors duration-200 flex items-center justify-center">
+                  <Plus size="16" />
+                </button>
               </div>
             </td>
                 </tr>

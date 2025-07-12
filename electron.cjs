@@ -40,6 +40,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
+        show: false, // 初始时不显示窗口
         webPreferences: {
             preload: path.join(__dirname, 'dist-electron/preload.cjs'),
             nodeIntegration: false,
@@ -56,6 +57,11 @@ function createWindow() {
     console.log(`[Main Process] Loading URL: ${startUrl}`);
     mainWindow.loadURL(startUrl).catch(err => {
         console.error(`[Main Process] Failed to load URL: ${startUrl}`, err);
+    });
+
+    // 只有当页面内容加载完毕并准备好显示时才显示窗口
+    mainWindow.webContents.once('ready-to-show', () => {
+        mainWindow.show();
     });
 
     if (!app.isPackaged) {
