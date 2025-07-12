@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "clean": "npx rimraf dist dist-electron",
     "rebuild:sqlite": "npx electron-rebuild --version 29.1.0 --module-dir=node_modules/better-sqlite3",
-    "postinstall": "npm run rebuild:sqlite",
+    "postinstall": "electron-builder install-app-deps && npm run rebuild:sqlite",
     "build:frontend": "vite build",
     "build:electron:compile": "vite build --config vite.main.config.ts",
     "build:electron:rename": "echo 'Renaming handled by Vite config'",

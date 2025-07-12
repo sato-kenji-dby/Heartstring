@@ -75,6 +75,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: SvelteKit sync
+        run: npx svelte-kit sync
+
       # 4. 运行打包命令
       - name: Build application
         # 使用 npm run build:app，这是我们在package.json中定义的
