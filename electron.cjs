@@ -30,70 +30,8 @@ process.on('unhandledRejection', (reason, promise) => {
 // 这是一个IIFE(立即调用函数表达式)，用于在顶层作用域使用await
 // 但为了简单，我们还是用更传统的require()
 let mainWindow; // 主窗口引用
-let db;         // 数据库服务实例
-let playerService; // 播放器服务实例
-let audioService; // 音频服务实例
-let libraryService; // 文件库服务实例
 
-try {
-    const MusicDatabase = require('./dist-electron/src/services/database/database.cjs').default;
-    const LibraryServiceModule = require('./dist-electron/src/services/library/LibraryService.cjs'); // 导入整个模块
-    const scanDirectory = LibraryServiceModule.scanDirectory || LibraryServiceModule.default?.scanDirectory; // 尝试从模块或其 default 属性中获取 scanDirectory
-    const { PlayerService } = require('./dist-electron/src/core/player/PlayerService.cjs');
-    const { AudioService } = require('./dist-electron/src/services/audio/AudioService.cjs'); // 导入 AudioService
-
-    // 实例化所有服务
-    db = new MusicDatabase();
-    playerService = new PlayerService();
-    audioService = new AudioService(playerService); // 实例化 AudioService 并传入 PlayerService
-
-} catch (error) {
-    console.error('Fatal: Failed to load and initialize core services.', error);
-    process.exit(1);
-}
-
-// --- 4. 核心功能函数 ---
-
-/**
- * 注册所有IPC事件监听器
- */
-function registerIpcHandlers() {
-    // 数据库和文件库相关
-    ipcMain.handle('get-all-tracks', () => db.getAllTracks());
-    ipcMain.handle('open-directory-dialog', async () => {
-        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-            properties: ['openDirectory'],
-        });
-        if (canceled || !filePaths || filePaths.length === 0) {
-            console.log('[Main Process] Directory selection canceled or no path selected.');
-            return [];
-        }
-
-        const selectedPath = filePaths[0];
-        console.log(`[Main Process] Selected directory: ${selectedPath}`);
-
-        const tracks = await scanDirectory(selectedPath);
-        console.log(`[Main Process] Found ${tracks.length} tracks.`);
-
-        if (tracks.length > 0) {
-            db.insertTracks(tracks);
-            console.log('[Main Process] Tracks inserted into database.');
-        } else {
-            console.log('[Main Process] No tracks found to insert.');
-        }
-        
-        return tracks;
-    });
-
-    // 播放控制相关 (将事件代理到audioService)
-    ipcMain.on('play-track', (_, track) => audioService.playTrack(track));
-    ipcMain.on('stop-playback', () => audioService.stopPlayback());
-    ipcMain.on('pause-playback', () => audioService.pausePlayback());
-    ipcMain.on('resume-playback', () => audioService.resumePlayback());
-    ipcMain.on('add-to-queue', (_, track) => audioService.addToQueue(track)); // 添加 addToQueue
-    // ipcMain.on('set-volume', (_, volume) => playerService.setVolume(volume)); // 移除或移动到 AudioService
-
-}
+// --- 3. 核心功能函数 ---
 
 /**
  * 创建和管理主窗口
@@ -108,9 +46,6 @@ function createWindow() {
             contextIsolation: true,
         },
     });
-
-    // 将 mainWindow.webContents.send 传递给 AudioService
-    audioService.setMainWindowSender(mainWindow.webContents.send.bind(mainWindow.webContents));
 
     const startUrl = process.env.ELECTRON_START_URL || url.format({
         pathname: path.join(__dirname, 'dist/index.html'),
@@ -135,10 +70,19 @@ function createWindow() {
 // --- 5. 应用生命周期事件绑定 ---
 
 // 只有当app准备好后，我们才创建窗口和注册IPC
-app.on('ready', () => {
+app.on('ready', async () => {
     console.log('[Main Process] App is ready.');
-    registerIpcHandlers();
     createWindow();
+    try {
+        // 动态导入并初始化主进程逻辑
+        const { initializeMainProcess } = await import('./dist-electron/src/electron/main.cjs');
+        await initializeMainProcess(mainWindow);
+        console.log('[Main Process] Core services initialized and IPC handlers registered.');
+    } catch (error) {
+        console.error('Fatal: Failed to initialize main process logic.', error);
+        dialog.showErrorBox('Fatal Application Error', error.stack || error.message);
+        app.quit();
+    }
 });
 
 app.on('window-all-closed', () => {

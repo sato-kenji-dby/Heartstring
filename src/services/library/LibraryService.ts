@@ -17,6 +17,7 @@ export async function scanDirectory(dir: string): Promise<Track[]> {
     const files = await fs.readdir(dir, { withFileTypes: true });
     for (const file of files) {
       const filePath = path.join(dir, file.name);
+      console.log(`Scanning: ${filePath}`); // 添加日志
       if (file.isDirectory()) {
         tracks = tracks.concat(await scanDirectory(filePath));
       } else if (SUPPORTED_EXTENSIONS.has(path.extname(file.name).toLowerCase())) {
@@ -30,6 +31,7 @@ export async function scanDirectory(dir: string): Promise<Track[]> {
             album: metadata.common.album || 'Unknown Album',
             duration: metadata.format.duration || 0,
           });
+          console.log(`Successfully processed: ${filePath}`); // 添加成功日志
         } catch (error) {
           console.error(`Error reading metadata for ${filePath}:`, error);
         }

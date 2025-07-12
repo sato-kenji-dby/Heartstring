@@ -52,13 +52,15 @@
 	"esModuleInterop": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node", "electron"] // 确保包含 electron 类型
   },
   // **核心：明确告诉tsc要编译哪些文件**
   "include": [
     "preload.ts",           // 编译根目录的 preload.ts
     "src/core/**/*.ts",     // 编译所有 core 目录下的 ts 文件
-    "src/services/**/*.ts"  // 编译所有 services 目录下的 ts 文件
+    "src/services/**/*.ts", // 编译所有 services 目录下的 ts 文件
+    "src/electron/**/*.ts"  // 包含新的 electron 主逻辑文件
   ],
   "exclude": [
     "node_modules",

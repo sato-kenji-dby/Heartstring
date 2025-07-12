@@ -1,0 +1,83 @@
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import * as path from 'path';
+import type { Track } from '$types';
+
+// 全局变量，用于存储服务实例
+let db: any;
+let playerService: any;
+let audioService: any;
+let scanDirectory: (dir: string) => Promise<Track[]>;
+
+/**
+ * 初始化所有核心服务和IPC处理器。
+ * 这个函数将在 Electron app ready 后被调用。
+ */
+export async function initializeMainProcess(mainWindow: BrowserWindow) {
+    try {
+        // 动态导入所有服务模块
+        const { default: MusicDatabase } = await import('$services/database/database');
+        const LibraryServiceModule = await import('$services/library/LibraryService');
+        const { PlayerService } = await import('$core/player/PlayerService');
+        const { AudioService } = await import('$services/audio/AudioService');
+
+        // 明确从 LibraryServiceModule 中获取 scanDirectory
+        scanDirectory = LibraryServiceModule.scanDirectory; 
+        if (!scanDirectory) {
+            throw new Error("scanDirectory function not found in LibraryServiceModule.");
+        }
+
+        // 实例化所有服务
+        db = new MusicDatabase();
+        playerService = new PlayerService();
+        audioService = new AudioService(playerService); // 实例化 AudioService 并传入 PlayerService
+
+        // 将 mainWindow.webContents.send 传递给 AudioService
+        audioService.setMainWindowSender(mainWindow.webContents.send.bind(mainWindow.webContents));
+
+        registerIpcHandlers(mainWindow);
+
+    } catch (error) {
+        console.error('Fatal: Failed to load and initialize core services in main.ts.', error);
+        // 在这里不退出进程，而是让 electron.cjs 处理退出
+        throw error; 
+    }
+}
+
+/**
+ * 注册所有IPC事件监听器
+ */
+function registerIpcHandlers(mainWindow: BrowserWindow) {
+    // 数据库和文件库相关
+    ipcMain.handle('get-all-tracks', () => db.getAllTracks());
+    ipcMain.handle('open-directory-dialog', async () => {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openDirectory'],
+        }) as unknown as Electron.OpenDialogReturnValue; // 先断言为 unknown，再断言为目标类型
+        if (canceled || !filePaths || filePaths.length === 0) {
+            console.log('[Main Process] Directory selection canceled or no path selected.');
+            return [];
+        }
+
+        const selectedPath = filePaths[0];
+        console.log(`[Main Process] Selected directory: ${selectedPath}`);
+
+        const tracks = await scanDirectory(selectedPath);
+        console.log(`[Main Process] Found ${tracks.length} tracks.`);
+
+        if (tracks.length > 0) {
+            db.insertTracks(tracks);
+            console.log('[Main Process] Tracks inserted into database.');
+        } else {
+            console.log('[Main Process] No tracks found to insert.');
+        }
+        
+        return tracks;
+    });
+
+    // 播放控制相关 (将事件代理到audioService)
+    ipcMain.on('play-track', (_, track) => audioService.playTrack(track));
+    ipcMain.on('stop-playback', () => audioService.stopPlayback());
+    ipcMain.on('pause-playback', () => audioService.pausePlayback());
+    ipcMain.on('resume-playback', () => audioService.resumePlayback());
+    ipcMain.on('add-to-queue', (_, track) => audioService.addToQueue(track));
+}
