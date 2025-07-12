@@ -45,69 +45,79 @@
   }
 </script>
 
-<h1 class="text-4xl font-bold text-center my-8 text-blue-400">Heartstring Music Player</h1>
+<div class="flex flex-col h-screen p-4 bg-slate-900 text-slate-100">
+  <h1 class="text-4xl font-bold text-center my-4 text-blue-400">Heartstring Music Player</h1>
 
-<PlayerControls />
+  <PlayerControls />
 
-<button on:click={handleSelectFolder} class="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200 block mx-auto my-4">
-  扫描音乐文件夹
-</button>
+  <button on:click={handleSelectFolder} class="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200 block mx-auto my-4">
+    扫描音乐文件夹
+  </button>
 
-<h2 class="text-2xl font-semibold mt-8 mb-4 text-blue-300">播放队列</h2>
-{#if queue.length > 0}
-  <div class="max-h-64 overflow-y-auto">
-    <table class="w-full table-auto border-collapse shadow-lg rounded-lg overflow-hidden">
-      <thead>
-        <tr class="bg-slate-700 text-slate-100 uppercase text-sm leading-normal">
-          <th class="py-3 px-6 text-left">Title</th>
-          <th class="py-3 px-6 text-left">Artist</th>
-          <th class="py-3 px-6 text-left">Album</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each queue as track (track.id)}
-          <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
-            <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
-            <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
-            <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
-{:else}
-  <p class="text-center text-slate-400 my-4">播放队列为空。</p>
-{/if}
+  <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-col w-1/2 pr-2">
+      <h2 class="text-2xl font-semibold mt-4 mb-2 text-blue-300">播放队列</h2>
+      {#if queue.length > 0}
+        <div class="flex-1 overflow-y-auto">
+          <table class="w-full table-auto border-collapse shadow-lg rounded-lg overflow-hidden">
+            <thead>
+              <tr class="bg-slate-700 text-slate-100 uppercase text-sm leading-normal">
+                <th class="py-3 px-6 text-left">Title</th>
+                <th class="py-3 px-6 text-left">Artist</th>
+                <th class="py-3 px-6 text-left">Album</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each queue as track (track.id)}
+                <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
+                  <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
+                  <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
+                  <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="text-center text-slate-400 my-4">播放队列为空。</p>
+      {/if}
+    </div>
 
-<h2 class="text-2xl font-semibold mt-8 mb-4 text-blue-300">音乐库</h2>
-{#if tracks.length > 0}
-  <div class="max-h-96 overflow-y-auto">
-    <table class="w-full table-auto border-collapse shadow-lg rounded-lg overflow-hidden">
-      <thead>
-        <tr class="bg-slate-700 text-slate-100 uppercase text-sm leading-normal">
-          <th class="py-3 px-6 text-left">Title</th>
-          <th class="py-3 px-6 text-left">Artist</th>
-          <th class="py-3 px-6 text-left">Album</th>
-          <th class="py-3 px-6 text-left">Duration</th>
-          <th class="py-3 px-6 text-left">操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each tracks as track (track.id)}
-          <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
-            <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
-            <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
-            <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
-            <td class="py-3 px-6 text-left">{track.duration ? track.duration.toFixed(2) + 's' : 'N/A'}</td>
+    <div class="flex flex-col w-1/2 pl-2">
+      <h2 class="text-2xl font-semibold mt-4 mb-2 text-blue-300">音乐库</h2>
+      {#if tracks.length > 0}
+        <div class="flex-1 overflow-y-auto">
+          <table class="w-full table-auto border-collapse shadow-lg rounded-lg overflow-hidden">
+            <thead>
+              <tr class="bg-slate-700 text-slate-100 uppercase text-sm leading-normal">
+                <th class="py-3 px-6 text-left">Title</th>
+                <th class="py-3 px-6 text-left">Artist</th>
+                <th class="py-3 px-6 text-left">Album</th>
+                <th class="py-3 px-6 text-left">Duration</th>
+                <th class="py-3 px-6 text-left">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each tracks as track (track.id)}
+                <tr class="border-b border-slate-600 hover:bg-slate-700 even:bg-slate-800">
+                  <td class="py-3 px-6 text-left">{track.title || '未知标题'}</td>
+                  <td class="py-3 px-6 text-left">{track.artist || '未知艺术家'}</td>
+                  <td class="py-3 px-6 text-left">{track.album || '未知专辑'}</td>
+                  <td class="py-3 px-6 text-left">{track.duration ? track.duration.toFixed(2) + 's' : 'N/A'}</td>
             <td class="py-3 px-6 text-left">
-              <button on:click={() => playTrack(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200 mr-2">播放</button>
-              <button on:click={() => addToQueue(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200 mr-2">添加到队列</button>
+              <div class="flex items-center space-x-2">
+                <button on:click={() => playTrack(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200">播放</button>
+                <button on:click={() => addToQueue(track)} class="bg-blue-500 text-white py-1 px-3 rounded-md text-sm hover:bg-blue-600 transition-colors duration-200">添加到队列</button>
+              </div>
             </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="text-center text-slate-400 my-4">未找到音乐。扫描文件夹以开始。</p>
+      {/if}
+    </div>
   </div>
-{:else}
-  <p class="text-center text-slate-400 my-4">未找到音乐。扫描文件夹以开始。</p>
-{/if}
+</div>
