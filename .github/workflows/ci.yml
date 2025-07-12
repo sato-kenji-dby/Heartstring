@@ -93,11 +93,11 @@ jobs:
         with:
           name: heartstring-${{ matrix.os }} # e.g., heartstring-windows-latest
           path: | # 指定要上传的文件路径，根据electron-builder的配置修改
-            dist/*.exe
-            dist/*.dmg
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
 
   # 第三部分：创建发布 (可选但推荐)
   create-release:
