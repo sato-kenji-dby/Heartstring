@@ -1,0 +1,82 @@
+### **《Heartstring开发实录：现代桌面应用构建的“血与沙”》**
+
+**核心技术栈：** Node.js, Electron, SvelteKit, Vite, TypeScript, SQLite
+**目标：** 构建一个健壮、可维护、体验优秀的跨平台桌面应用。
+
+---
+
+#### **一、 核心架构与设计哲学 (The Grand Design)**
+
+1.  **架构选型：多进程模型是基石**
+    *   **主进程 (Main Process):** 绝对的“后端”。负责所有与操作系统交互的“重活、脏活”：窗口管理、文件系统I/O（扫描音乐）、数据库操作、调用外部进程（FFmpeg）、管理应用的生命周期。**它必须保持纯粹的Node.js环境，绝不能直接依赖任何前端框架的运行时（如Svelte Store）。**
+    *   **渲染进程 (Renderer Process):** 纯粹的“前端”。负责UI的渲染和用户交互。它活在Chromium的沙箱里，使用SvelteKit构建，所有需要系统权限的操作都必须通过IPC委托给主进程。
+    *   **预加载脚本 (Preload Script):** 唯一的、安全的“桥梁”。负责在主进程和渲染进程之间，通过`contextBridge`暴露安全的、定义明确的API接口。
+
+2.  **模块系统：拥抱ESM，隔离CJS**
+    *   **项目主体 (`package.json`):** 设置`"type": "module"`，让整个项目默认工作在现代的ES Modules (ESM)模式下。
+    *   **核心代码 (`src/`):** **100%** 使用TypeScript和ESM语法 (`import/export`)。这是项目的“净土”，保证了代码的现代化和工具链的兼容性。
+    *   **必要的妥协 (`electron.cjs`):** Electron的入口文件使用`.cjs`后缀，强制其在CommonJS模式下运行。它的职责被严格限定为“引导程序”：**异步地、使用动态`import()`来加载并启动真正的、用ESM编写的主进程逻辑。**
+
+3.  **项目结构：高内聚，低耦合**
+    *   将代码按功能或领域（如`player`, `library`, `database`）组织成模块化的服务类（如`PlayerService`, `LibraryService`）。
+    *   每个服务都应该职责单一，并通过清晰的接口与其他服务交互。这使得代码易于理解、测试和维护。
+
+---
+
+#### **二、 构建与工具链配置 (Taming the Toolchain)**
+
+1.  **Vite：唯一的构建真神**
+    *   **核心理念：** 放弃“tsc独立编译主进程”的“双世界”模式。无论是前端还是Electron主进程，都**统一使用Vite**进行构建。
+    *   **`vite.config.ts` (前端):** 使用`@sveltejs/kit/vite`插件，负责构建SvelteKit应用。
+    *   **`vite.main.config.ts` (主进程/预加载):** **这是关键！** 创建一个独立的Vite配置，使用其**库模式 (Library Mode)** 或 **SSR模式**来构建主进程和预加载脚本。
+        *   **入口 (`build.lib.entry`):** 指定`main.ts`和`preload.ts`。
+        *   **输出格式 (`build.lib.formats`):** 强制为`'cjs'`。
+        *   **外部依赖 (`build.rollupOptions.external`):** 将`electron`、`node:fs`等所有原生模块和原生依赖标记为外部，防止被打包。
+
+2.  **路径别名：三位一体，显式为王**
+    *   **单一来源 (`alias.config.js`):** 将所有路径别名定义在一个独立的文件中。
+    *   **显式配置：** 在`svelte.config.js`, `vite.config.ts`, `vite.main.config.ts`以及`vitest.config.ts`中，**全部**导入并显式配置`resolve.alias`。这消除了所有因“魔法注入”和“工具链裂缝”导致的解析问题，虽然看起来重复，但提供了无与伦比的稳定性和可预测性。
+
+3.  **TypeScript配置 (`tsconfig.json`)**
+    *   **`verbatimModuleSyntax: false`:** 在遇到与测试工具的兼容性问题时，这可能是救命稻草。它放宽了TS最严格的模块语法检查，以兼容那些尚未完全跟上的工具。
+    *   `paths`: 主要服务于VSCode的IntelliSense和`svelte-check`。真正的运行时路径解析由Vite负责。
+
+---
+
+#### **三、 常见问题与解决方案 (The Troubleshooting Grimoire)**
+
+1.  **问题：原生模块 (`better-sqlite3`) 在Electron中版本不匹配。**
+    *   **原因：** 系统Node.js版本与Electron内置Node.js版本不同。
+    *   **解决方案：** 使用`electron-rebuild`。在`package.json`中配置`postinstall`脚本来自动执行它，一劳永逸。
+    *   **前置条件：** Windows上必须安装好Visual Studio Build Tools和Python。
+
+2.  **问题：`ERR_PACKAGE_PATH_NOT_EXPORTED` 或 CJS/ESM 互操作失败。**
+    *   **原因：** 在CJS环境中尝试`require()`一个只提供ESM入口的纯ESM包。
+    *   **解决方案：** 严格遵循架构原则。将所有业务逻辑保持在ESM中，只在`.cjs`入口文件中，使用**异步动态`import()`**来加载ESM世界的“总开关”。
+
+3.  **问题：`$someAlias/module` 在编译后的代码中无法被Node.js识别。**
+    *   **原因：** 使用了`tsc`直接编译，而`tsc`不负责路径替换。
+    *   **失败的尝试：** `tsc-alias`。这是一个“补丁”，不如从根源解决。
+    *   **最终解决方案：** **迁移到Vite统一构建流程。** 让Vite在构建主进程代码时，原生、可靠地完成路径替换。
+
+4.  **问题：主进程代码直接导入/操作Svelte Store，导致应用崩溃。**
+    *   **原因：** 这是一个**根本性的架构错误**。主进程是Node.js环境，不认识任何Svelte的运行时API。
+    *   **解决方案：** **严格遵守进程边界。** 主进程通过`win.webContents.send()`发送**纯数据**消息，渲染进程通过`ipcRenderer.on()`接收消息并**在前端**更新Store。
+
+5.  **问题：音频播放 (`play-sound`) 失败且错误信息模糊。**
+    *   **原因：** 依赖了不透明的、行为不可靠的第三方高级封装库。
+    *   **解决方案：** **回归底层，构建自己的服务。** 放弃`play-sound`，直接使用`child_process.spawn`封装一个`PlayerService`来调用`ffplay`。这提供了完全的控制权、详尽的错误信息和未来的可扩展性。
+
+6.  **问题：复杂的异步逻辑（如播放队列、音量控制）导致竞态条件。**
+    *   **原因：** 对异步事件（特别是进程的`close`事件）的处理不够严谨。
+    *   **解决方案：**
+        *   **传递上下文：** 在创建事件监听器时，将当前进程的引用传入回调函数。
+        *   **检查引用：** 在回调函数执行时，检查事件来源的进程引用是否与服务当前持有的进程引用一致，如果不一致，则忽略该事件（因为它来自一个“过时”的进程）。
+
+---
+
+#### **四、 任何值得注意的地方 (Words of Wisdom)**
+
+*   **“如果它没坏，就不要修复它”是陷阱：** 对于一个需要长期演进的项目，“能运行”远远不够。“能健康地进化”才是目标。前期的重构阵痛，是为了换取未来的敏捷和稳固。
+*   **AI是副驾驶，你是飞行员：** AI能极大地加速你的编码过程，但它无法替你做出战略性的架构决策。你需要用你的经验和洞察力去引导它，并审视它生成的代码是否符合项目的长远利益。
+*   **理解工具链的“为什么”：** 不要满足于“它能工作了”。像你一样，去追问“为什么之前不行，现在又行了？”，直到理解`verbatimModuleSyntax`、Vite缓存、`extends`继承链这些底层机制。这种深度理解，才是你作为工程师最核心的竞争力。
