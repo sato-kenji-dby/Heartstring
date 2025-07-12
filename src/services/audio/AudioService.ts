@@ -105,6 +105,22 @@ export class AudioService {
     });
   }
 
+
+  /**
+   * 仅播放单曲并清空队列（用于库中直接点播）
+   */
+  async playSingleTrack(track: Track) {
+    await this.playerService.stop();
+    this.queue = [];
+    if (this.sendToRenderer) {
+      this.sendToRenderer('player-store-update', { queue: [] });
+    }
+    this.playerService.play(track);
+  }
+
+  /**
+   * 队列播放（不清空队列，仅正常播放）
+   */
   playTrack(track: Track) {
     this.playerService.play(track);
   }

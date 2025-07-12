@@ -23,6 +23,12 @@ const createPlayerStore = () => {
     play: (track: Track) => {
       ipcRenderer.send('play-track', track);
     },
+    /**
+     * 仅播放单曲并清空队列（用于库中直接点播）
+     */
+    playSingleTrack: (track: Track) => {
+      ipcRenderer.send('play-single-track', track);
+    },
     pause: () => {
       ipcRenderer.send('pause-playback');
     },
