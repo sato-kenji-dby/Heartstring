@@ -5,9 +5,9 @@ name: Heartstring CI/CD
 # 触发工作流的事件
 on:
   push: # 当有代码推送到...
-    branches: ['master'] # 更改为 main 分支
+    branches: ['master'] # 更改为 master 分支
   pull_request: # 或者当有PR提交到...
-    branches: ['master'] # 更改为 main 分支
+    branches: ['master'] # 更改为 master 分支
 
 # 定义工作流要执行的任务
 jobs:
@@ -82,6 +82,8 @@ jobs:
       - name: Build application
         # 使用 npm run build:app，这是我们在package.json中定义的
         run: npm run build:app
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       # 5. 上传构建产物（打包好的安装包）
       # 这会将打包好的文件（如.exe, .dmg, .AppImage）上传到GitHub Actions的“Artifacts”中
@@ -101,7 +103,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     needs: build # 依赖 build 作业
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' # 仅在推送到 main 分支时触发
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' # 仅在推送到 master 分支时触发
     runs-on: ubuntu-latest
     permissions:
       contents: write # 允许写入发布内容
