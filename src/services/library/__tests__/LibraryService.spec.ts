@@ -20,8 +20,8 @@ vi.mock('music-metadata', () => ({
 }));
 
 // 动态导入被 mock 的模块，以便我们访问它们的 mock 函数
-let fs: any;
-let mm: any;
+let fs: typeof import('fs/promises');
+let mm: typeof import('music-metadata');
 
 // 导入被测试的函数
 import { scanDirectory } from '../LibraryService';
@@ -76,9 +76,11 @@ describe('scanDirectory Unit Tests', () => {
     ];
 
     // 安排 (Arrange)
-    fs.readdir.mockResolvedValue(entries);
-    mm.parseFile.mockImplementation((filePath: string) =>
-      Promise.resolve(mockMetadata(`Title for ${path.basename(filePath)}`))
+    vi.mocked(fs.readdir).mockResolvedValue(entries as any);
+    vi.mocked(mm.parseFile).mockImplementation((filePath: string) =>
+      Promise.resolve(
+        mockMetadata(`Title for ${path.basename(filePath)}`) as any
+      )
     );
 
     // 行动 (Act)
@@ -97,24 +99,28 @@ describe('scanDirectory Unit Tests', () => {
     const popDir = path.join(rootDir, 'Pop');
 
     // 安排 (Arrange)
-    fs.readdir.mockImplementation(async (dirPath: string) => {
-      if (dirPath === rootDir) {
-        return [
-          createDirent('song1.mp3', 'file'),
-          createDirent('Rock', 'dir'),
-          createDirent('Pop', 'dir'),
-        ];
+    vi.mocked(fs.readdir).mockImplementation(
+      async (dirPath: string | Buffer | URL) => {
+        if (dirPath.toString() === rootDir) {
+          return [
+            createDirent('song1.mp3', 'file'),
+            createDirent('Rock', 'dir'),
+            createDirent('Pop', 'dir'),
+          ] as any;
+        }
+        if (dirPath.toString() === rockDir) {
+          return [createDirent('song2.flac', 'file')] as any;
+        }
+        if (dirPath.toString() === popDir) {
+          return [createDirent('song3.wav', 'file')] as any;
+        }
+        return [] as any;
       }
-      if (dirPath === rockDir) {
-        return [createDirent('song2.flac', 'file')];
-      }
-      if (dirPath === popDir) {
-        return [createDirent('song3.wav', 'file')];
-      }
-      return [];
-    });
+    );
 
-    mm.parseFile.mockResolvedValue(mockMetadata('A Great Song'));
+    vi.mocked(mm.parseFile).mockResolvedValue(
+      mockMetadata('A Great Song') as any
+    );
 
     // 行动 (Act)
     const tracks = await scanDirectory(rootDir);
@@ -131,12 +137,14 @@ describe('scanDirectory Unit Tests', () => {
 
   it('should handle missing metadata tags by using fallback values', async () => {
     const fakeDir = '/music/partial';
-    fs.readdir.mockResolvedValue([createDirent('song.mp3', 'file')]);
-    mm.parseFile.mockResolvedValue({
+    vi.mocked(fs.readdir).mockResolvedValue([
+      createDirent('song.mp3', 'file'),
+    ] as any);
+    vi.mocked(mm.parseFile).mockResolvedValue({
       // 模拟一个只有部分标签的元数据对象
       common: { artist: 'Just an Artist' },
       format: { duration: 123 },
-    });
+    } as any);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -153,7 +161,7 @@ describe('scanDirectory Unit Tests', () => {
 
   it('should return an empty array for an empty directory', async () => {
     const fakeDir = '/empty';
-    fs.readdir.mockResolvedValue([]);
+    vi.mocked(fs.readdir).mockResolvedValue([]);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -163,10 +171,10 @@ describe('scanDirectory Unit Tests', () => {
 
   it('should return an empty array for a directory with only unsupported files', async () => {
     const fakeDir = '/no-music';
-    fs.readdir.mockResolvedValue([
+    vi.mocked(fs.readdir).mockResolvedValue([
       createDirent('image.png', 'file'),
       createDirent('document.pdf', 'file'),
-    ]);
+    ] as any);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -178,11 +186,14 @@ describe('scanDirectory Unit Tests', () => {
     const fakeDir = '/folders';
     const subDir = path.join(fakeDir, 'empty_subdir');
 
-    fs.readdir.mockImplementation(async (dirPath: string) => {
-      if (dirPath === fakeDir) return [createDirent('empty_subdir', 'dir')];
-      if (dirPath === subDir) return []; // 子目录是空的
-      return [];
-    });
+    vi.mocked(fs.readdir).mockImplementation(
+      async (dirPath: string | Buffer | URL) => {
+        if (dirPath.toString() === fakeDir)
+          return [createDirent('empty_subdir', 'dir')] as any;
+        if (dirPath.toString() === subDir) return [] as any; // 子目录是空的
+        return [] as any;
+      }
+    );
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -195,14 +206,17 @@ describe('scanDirectory Unit Tests', () => {
     const L2 = path.join(L1, 'L2');
     const L3 = path.join(L2, 'L3');
 
-    fs.readdir.mockImplementation(async (p: string) => {
-      if (p === L1) return [createDirent('L2', 'dir')];
-      if (p === L2) return [createDirent('L3', 'dir')];
-      if (p === L3) return [createDirent('deep-song.m4a', 'file')];
-      return [];
-    });
+    vi.mocked(fs.readdir).mockImplementation(
+      async (p: string | Buffer | URL) => {
+        if (p.toString() === L1) return [createDirent('L2', 'dir')] as any;
+        if (p.toString() === L2) return [createDirent('L3', 'dir')] as any;
+        if (p.toString() === L3)
+          return [createDirent('deep-song.m4a', 'file')] as any;
+        return [] as any;
+      }
+    );
 
-    mm.parseFile.mockResolvedValue(mockMetadata('Deep Song'));
+    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('Deep Song') as any);
 
     const tracks = await scanDirectory(L1);
 
@@ -217,7 +231,7 @@ describe('scanDirectory Unit Tests', () => {
   it('should return an empty array and log error if the root directory cannot be read', async () => {
     const fakeDir = '/non-existent';
     const error = new Error('ENOENT: no such file or directory');
-    fs.readdir.mockRejectedValue(error);
+    vi.mocked(fs.readdir).mockRejectedValue(error);
 
     const tracks = await scanDirectory(fakeDir);
 
@@ -233,14 +247,14 @@ describe('scanDirectory Unit Tests', () => {
     const badFile = path.join(fakeDir, 'bad.flac');
     const parseError = new Error('Corrupted metadata');
 
-    fs.readdir.mockResolvedValue([
+    vi.mocked(fs.readdir).mockResolvedValue([
       createDirent('good.mp3', 'file'),
       createDirent('bad.flac', 'file'),
-    ]);
+    ] as any);
 
-    mm.parseFile.mockImplementation(async (filePath: string) => {
+    vi.mocked(mm.parseFile).mockImplementation(async (filePath: string) => {
       if (filePath === badFile) throw parseError;
-      return mockMetadata('Good Song');
+      return mockMetadata('Good Song') as any;
     });
 
     const tracks = await scanDirectory(fakeDir);
@@ -259,19 +273,22 @@ describe('scanDirectory Unit Tests', () => {
     const badDir = path.join(rootDir, 'bad');
     const accessError = new Error('EACCES: permission denied');
 
-    fs.readdir.mockImplementation(async (dirPath: string) => {
-      if (dirPath === rootDir)
-        return [
-          createDirent('root.mp3', 'file'),
-          createDirent('good', 'dir'),
-          createDirent('bad', 'dir'),
-        ];
-      if (dirPath === goodDir) return [createDirent('good-song.wav', 'file')];
-      if (dirPath === badDir) throw accessError; // 此目录读取失败
-      return [];
-    });
+    vi.mocked(fs.readdir).mockImplementation(
+      async (dirPath: string | Buffer | URL) => {
+        if (dirPath.toString() === rootDir)
+          return [
+            createDirent('root.mp3', 'file'),
+            createDirent('good', 'dir'),
+            createDirent('bad', 'dir'),
+          ] as any;
+        if (dirPath.toString() === goodDir)
+          return [createDirent('good-song.wav', 'file')] as any;
+        if (dirPath.toString() === badDir) throw accessError; // 此目录读取失败
+        return [] as any;
+      }
+    );
 
-    mm.parseFile.mockResolvedValue(mockMetadata('A Song'));
+    vi.mocked(mm.parseFile).mockResolvedValue(mockMetadata('A Song') as any);
 
     const tracks = await scanDirectory(rootDir);
 
