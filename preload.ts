@@ -5,6 +5,7 @@ console.log('[Preload] Preload script started.');
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
   getAllTracks: () => ipcRenderer.invoke('get-all-tracks'),
+  getLicenses: () => ipcRenderer.invoke('get-licenses'), // 添加新的 IPC 调用
 });
 
 contextBridge.exposeInMainWorld('ipcRenderer', {

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs'; // Use namespace import for better compatibility
 import type { Track } from '$types';
 
 // 全局变量，用于存储服务实例
@@ -72,6 +73,21 @@ function registerIpcHandlers(mainWindow: BrowserWindow) {
         }
         
         return tracks;
+    });
+
+    // 添加 'get-licenses' IPC 处理器
+    ipcMain.handle('get-licenses', async () => {
+        try {
+            // In development, app.getAppPath() might point to the wrong place.
+            // process.cwd() is more reliable for finding the project root.
+            const basePath = app.isPackaged ? app.getAppPath() : process.cwd();
+            const licensesPath = path.join(basePath, 'licenses.json');
+            const licensesData = fs.readFileSync(licensesPath, 'utf-8');
+            return JSON.parse(licensesData);
+        } catch (error) {
+            console.error('Error reading licenses.json:', error);
+            return { error: 'Failed to load licenses' };
+        }
     });
 
     // 播放控制相关 (将事件代理到audioService)

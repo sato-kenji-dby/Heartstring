@@ -19,6 +19,7 @@ declare global {
   interface ElectronAPI {
     openDirectoryDialog: () => Promise<string | null>;
     getAllTracks: () => Promise<Track[]>;
+    getLicenses: () => Promise<any>; // Added for acknowledgements page
   }
 
   interface IpcRendererAPI {
