@@ -9,7 +9,7 @@ const config = {
 
   kit: {
     adapter: adapter({
-      fallback: 'index.html'
+      fallback: 'index.html',
     }),
     alias: {
       $api: './src/api',
@@ -24,8 +24,8 @@ const config = {
     },
     paths: {
       base: '', // 确保应用程序的基路径是绝对路径
-      assets: '' // 确保静态资源路径是相对于基路径的
-    }
+      assets: '', // 确保静态资源路径是相对于基路径的
+    },
   },
 };
 

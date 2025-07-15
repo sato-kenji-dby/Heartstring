@@ -7,7 +7,17 @@ const path = require('path');
 const url = require('url');
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { standard: true, secure: true, bypassCSP: true, allowServiceWorkers: true, supportFetchAPI: true, corsEnabled: true } }
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      bypassCSP: true,
+      allowServiceWorkers: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 process.on('uncaughtException', (error, origin) => {
@@ -45,8 +55,7 @@ function createWindow() {
     },
   });
 
-  const startUrl =
-    process.env.ELECTRON_START_URL || 'app:///index.html'; // Changed to app:///index.html
+  const startUrl = process.env.ELECTRON_START_URL || 'app:///index.html'; // Changed to app:///index.html
 
   console.log(`[Main Process] Loading URL: ${startUrl}`);
   mainWindow.loadURL(startUrl).catch((err) => {

@@ -9,6 +9,8 @@ export default [
     ignores: [
       '.svelte-kit/',
       'dist-electron/',
+      'release/',
+      'build/',
       'electron.cjs',
       'src/services/audio/__tests__/AudioService.spec.ts',
     ],
