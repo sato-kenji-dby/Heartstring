@@ -23,7 +23,8 @@ const config = {
       routes: 'src/ui/pages',
     },
     paths: {
-      assets: '' // 让静态资源路径变成相对路径，适配 Electron file://
+      base: '', // 确保应用程序的基路径是绝对路径
+      assets: '' // 确保静态资源路径是相对于基路径的
     }
   },
 };

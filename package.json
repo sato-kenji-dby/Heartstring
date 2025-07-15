@@ -43,11 +43,10 @@
     "rebuild:sqlite": "npx electron-rebuild --version 29.1.0 --module-dir=node_modules/better-sqlite3",
     "postinstall": "electron-builder install-app-deps && npm run rebuild:sqlite",
     "build:frontend": "vite build",
-    "postbuild": "node scripts/fix-paths.cjs",
     "build:electron:compile": "vite build --config vite.main.config.ts",
     "build:electron:rename": "echo 'Renaming handled by Vite config'",
     "build:electron": "npm run build:electron:compile",
-    "build": "npm run clean && npm run build:frontend && npm run postbuild && npm run build:electron",
+    "build": "npm run clean && npm run build:frontend && npm run build:electron",
     "dev:frontend": "npx vite dev",
     "watch:electron": "vite build --config vite.main.config.ts --watch",
     "start:electron:dev": "cross-env ELECTRON_START_URL=http://localhost:5173 npx nodemon",
@@ -57,7 +56,8 @@
     "dev:electron:start": "nodemon --watch \"dist-electron/**/*.cjs\" --ext cjs --exec \"electron electron.cjs\"",
     "start": "electron dist-electron/electron.cjs",
     "build:app": "npm run build && npx electron-builder",
-    "generate-licenses": "npm-license-crawler --onlyDirectDependencies --json licenses.json"
+    "generate-licenses": "npm-license-crawler --onlyDirectDependencies --json licenses.json",
+    "dev:app-protocol": "npm run build:frontend && electron ."
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
