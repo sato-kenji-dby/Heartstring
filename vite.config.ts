@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [sveltekit()],
+  base: './',
   resolve: {
     alias: {
       $api: path.resolve('./src/api'),

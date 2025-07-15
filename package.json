@@ -17,6 +17,7 @@
       "!LICENSE",
       "!README.md",
       "!src/",
+      "!docs/",
       "!.vscode/",
       "!vite.*.ts",
       "!vitest.*.ts",
@@ -24,7 +25,12 @@
       "!tailwind.config.js",
       "!tsconfig.json",
       "!.npmrc",
-      "!.eslintrc.*.cjs"
+      "!.eslintrc.cjs",
+      "!eslint.config.js",
+      "!.prettierrc",
+      "!test-data",
+      "!*.db",
+      "build/"
     ]
   },
   "scripts": {
@@ -37,10 +43,11 @@
     "rebuild:sqlite": "npx electron-rebuild --version 29.1.0 --module-dir=node_modules/better-sqlite3",
     "postinstall": "electron-builder install-app-deps && npm run rebuild:sqlite",
     "build:frontend": "vite build",
+    "postbuild": "node scripts/fix-paths.cjs",
     "build:electron:compile": "vite build --config vite.main.config.ts",
     "build:electron:rename": "echo 'Renaming handled by Vite config'",
     "build:electron": "npm run build:electron:compile",
-    "build": "npm run clean && npm run build:frontend && npm run build:electron",
+    "build": "npm run clean && npm run build:frontend && npm run postbuild && npm run build:electron",
     "dev:frontend": "npx vite dev",
     "watch:electron": "vite build --config vite.main.config.ts --watch",
     "start:electron:dev": "cross-env ELECTRON_START_URL=http://localhost:5173 npx nodemon",
@@ -57,6 +64,7 @@
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-typescript": "^12.1.4",
     "@sveltejs/adapter-auto": "^6.0.0",
+    "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@testing-library/svelte": "^5.2.8",
